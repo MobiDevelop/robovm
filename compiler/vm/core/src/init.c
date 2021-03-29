@@ -353,6 +353,9 @@ Env* rvmStartup(Options* options) {
     // Add the current image (executable) to the list of native libs used for
     // resolution of native methods in classes loaded by the boot ClassLoader.
     rvmLoadNativeLibrary(env, NULL, NULL);
+    // register natives methods.
+    TRACE("Register natives methods");
+    if (!rvmRTInit(env)) return NULL;
 
     // Call init on modules
     TRACE("Initializing classes");
@@ -382,7 +385,7 @@ Env* rvmStartup(Options* options) {
 
     // Initialize the rt JNI code
     TRACEF("Initializing the %s runtime library", rvmRTGetName());
-    if (!rvmRTInit(env)) return NULL;
+    if (!rvmRTOnLoad(env)) return NULL;
 
 #ifdef DARWIN
     TRACE("Initializing JAR NSURLProtocol");

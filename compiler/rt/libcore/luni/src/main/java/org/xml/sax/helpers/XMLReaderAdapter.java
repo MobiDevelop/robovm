@@ -6,6 +6,7 @@
 
 package org.xml.sax.helpers;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import java.io.IOException;
 import java.util.Locale;
 import org.xml.sax.AttributeList;
@@ -95,6 +96,7 @@ public class XMLReaderAdapter implements Parser, ContentHandler
      *
      * @param xmlReader The embedded XMLReader.
      */
+    @UnsupportedAppUsage
     private void setup (XMLReader xmlReader)
     {
     if (xmlReader == null) {
@@ -227,6 +229,7 @@ public class XMLReaderAdapter implements Parser, ContentHandler
     /**
      * Set up the XML reader.
      */
+    @UnsupportedAppUsage
     private void setupXMLReader ()
     throws SAXException
     {
@@ -425,8 +428,11 @@ public class XMLReaderAdapter implements Parser, ContentHandler
     // Internal state.
     ////////////////////////////////////////////////////////////////////
 
+    @UnsupportedAppUsage
     XMLReader xmlReader;
+    @UnsupportedAppUsage
     DocumentHandler documentHandler;
+    @UnsupportedAppUsage
     AttributesAdapter qAtts;
 
 

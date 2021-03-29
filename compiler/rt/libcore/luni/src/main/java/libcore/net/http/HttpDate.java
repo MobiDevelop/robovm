@@ -16,6 +16,7 @@
 
 package libcore.net.http;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -68,6 +69,7 @@ public final class HttpDate {
      * Returns the date for {@code value}. Returns null if the value couldn't be
      * parsed.
      */
+    @UnsupportedAppUsage
     public static Date parse(String value) {
         try {
             return STANDARD_DATE_FORMAT.get().parse(value);
@@ -85,6 +87,7 @@ public final class HttpDate {
     /**
      * Returns the string for {@code value}.
      */
+    @UnsupportedAppUsage
     public static String format(Date value) {
         return STANDARD_DATE_FORMAT.get().format(value);
     }

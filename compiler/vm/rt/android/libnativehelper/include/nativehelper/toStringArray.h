@@ -17,13 +17,20 @@
 #ifndef TO_STRING_ARRAY_H_included
 #define TO_STRING_ARRAY_H_included
 
-#include "jni.h"
-#include "ScopedLocalRef.h"
+#include <stddef.h>
+
+#include <jni.h>
+#include "module_api.h"
+
+// Public API for libnativehelper library.
+MODULE_API jobjectArray newStringArray(JNIEnv* env, size_t count);
+MODULE_API jobjectArray toStringArray(JNIEnv* env, const char* const* strings);
+
+#ifdef __cplusplus
 
 #include <string>
 #include <vector>
-
-jobjectArray newStringArray(JNIEnv* env, size_t count);
+#include "ScopedLocalRef.h"
 
 template <typename Counter, typename Getter>
 jobjectArray toStringArray(JNIEnv* env, Counter* counter, Getter* getter) {
@@ -45,29 +52,27 @@ jobjectArray toStringArray(JNIEnv* env, Counter* counter, Getter* getter) {
     return result;
 }
 
-template <typename Counter, typename Getter>
-jobjectArray toStringArray16(JNIEnv* env, Counter* counter, Getter* getter) {
-    size_t count = (*counter)();
-    jobjectArray result = newStringArray(env, count);
-    if (result == NULL) {
-        return NULL;
+struct VectorCounter {
+    const std::vector<std::string>& strings;
+    explicit VectorCounter(const std::vector<std::string>& strings) : strings(strings) {}
+    size_t operator()() {
+        return strings.size();
     }
-    for (size_t i = 0; i < count; ++i) {
-        int32_t charCount;
-        const jchar* chars = (*getter)(&charCount);
-        ScopedLocalRef<jstring> s(env, env->NewString(chars, charCount));
-        if (env->ExceptionCheck()) {
-            return NULL;
-        }
-        env->SetObjectArrayElement(result, i, s.get());
-        if (env->ExceptionCheck()) {
-            return NULL;
-        }
+};
+struct VectorGetter {
+    const std::vector<std::string>& strings;
+    explicit VectorGetter(const std::vector<std::string>& strings) : strings(strings) {}
+    const char* operator()(size_t i) {
+        return strings[i].c_str();
     }
-    return result;
+};
+
+inline jobjectArray toStringArray(JNIEnv* env, const std::vector<std::string>& strings) {
+    VectorCounter counter(strings);
+    VectorGetter getter(strings);
+    return toStringArray<VectorCounter, VectorGetter>(env, &counter, &getter);
 }
 
-JNIEXPORT jobjectArray toStringArray(JNIEnv* env, const std::vector<std::string>& strings);
-JNIEXPORT jobjectArray toStringArray(JNIEnv* env, const char* const* strings);
+#endif  // __cplusplus
 
 #endif  // TO_STRING_ARRAY_H_included

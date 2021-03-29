@@ -17,7 +17,7 @@
 #include <stdio.h>  // For BUFSIZ
 
 #include "JniException.h"
-#include "JNIHelp.h"
+#include <nativehelper/JNIHelp.h>
 
 void jniThrowExceptionWithErrno(JNIEnv* env, const char* exceptionClassName, int error) {
     char buf[BUFSIZ];

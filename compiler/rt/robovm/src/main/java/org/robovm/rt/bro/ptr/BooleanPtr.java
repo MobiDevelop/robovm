@@ -18,6 +18,7 @@ package org.robovm.rt.bro.ptr;
 import java.util.Arrays;
 
 import org.robovm.rt.VM;
+import org.robovm.rt.bro.ArrayUtils;
 import org.robovm.rt.bro.Struct;
 import org.robovm.rt.bro.annotation.StructMember;
 
@@ -112,7 +113,7 @@ public final class BooleanPtr extends Struct<BooleanPtr> {
      * @param count the number of elements to copy.
      */
     public void get(boolean[] dst, int offset, int count) {
-        Arrays.checkOffsetAndCount(dst.length, offset, count);
+        ArrayUtils.checkOffsetAndCount(dst.length, offset, count);
         long h = getHandle();
         for (int i = 0; i < count; i++) {
             dst[i + offset] = VM.getByte(h++) != 0;
@@ -138,7 +139,7 @@ public final class BooleanPtr extends Struct<BooleanPtr> {
      * @param count the number of elements to copy.
      */
     public void set(boolean[] src, int offset, int count) {
-        Arrays.checkOffsetAndCount(src.length, offset, count);
+        ArrayUtils.checkOffsetAndCount(src.length, offset, count);
         long h = getHandle();
         for (int i = 0; i < count; i++) {
             VM.setByte(h++, (byte) (src[i + offset] ? 1 : 0));

@@ -1,7 +1,9 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
 ******************************************************************************
 *
-*   Copyright (C) 1996-2004, International Business Machines
+*   Copyright (C) 1996-2013, International Business Machines
 *   Corporation and others.  All Rights Reserved.
 *
 ******************************************************************************
@@ -28,9 +30,10 @@
 
 #define LANGUAGE_LCID(hostID) (uint16_t)(0x03FF & hostID)
 
-U_CAPI const char *uprv_convertToPosix(uint32_t hostid, UErrorCode* status);
+U_CAPI int32_t uprv_convertToPosix(uint32_t hostid, char* posixID, int32_t posixIDCapacity, UErrorCode* status);
 
-/* Don't call this function directly. Use uloc_getLCID instead. */
+/* Don't call these functions directly. Use uloc_getLCID instead. */
+U_CAPI uint32_t uprv_convertToLCIDPlatform(const char *localeID);   // Leverage platform conversion if possible
 U_CAPI uint32_t uprv_convertToLCID(const char *langID, const char* posixID, UErrorCode* status);
 
 #endif /* LOCMAP_H */

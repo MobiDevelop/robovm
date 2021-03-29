@@ -1,3 +1,5 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
 ******************************************************************************
 * Copyright (C) 2009-2012, International Business Machines Corporation and
@@ -56,25 +58,14 @@ UBool FieldPositionIterator::operator==(const FieldPositionIterator &rhs) const 
   return rhs.data ? data->operator==(*rhs.data) : FALSE;
 }
 
-// BEGIN android-added
-int32_t FieldPositionIterator::getData(int32_t *dest, int32_t capacity) const {
-  int32_t len = data ? data->size() : 0;
-  if (len && dest) {
-    if (capacity < len) {
-      len = -len; // error, insufficient capacity
-    } else {
-      memcpy(dest, data->getBuffer(), len * sizeof(int32_t));
-    }
-  }
-  return len;
-}
-// END android-added
-
 void FieldPositionIterator::setData(UVector32 *adopt, UErrorCode& status) {
   // Verify that adopt has valid data, and update status if it doesn't.
   if (U_SUCCESS(status)) {
     if (adopt) {
-      if ((adopt->size() % 3) != 0) {
+      if (adopt->size() == 0) {
+        delete adopt;
+        adopt = NULL;
+      } else if ((adopt->size() % 3) != 0) {
         status = U_ILLEGAL_ARGUMENT_ERROR;
       } else {
         for (int i = 1; i < adopt->size(); i += 3) {

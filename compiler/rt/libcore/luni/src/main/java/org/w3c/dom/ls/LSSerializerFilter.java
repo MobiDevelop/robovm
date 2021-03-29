@@ -12,6 +12,7 @@
 
 package org.w3c.dom.ls;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import org.w3c.dom.traversal.NodeFilter;
 
 /**
@@ -60,6 +61,7 @@ public interface LSSerializerFilter extends NodeFilter {
      * <br> The constants used here are defined in [<a href='http://www.w3.org/TR/2000/REC-DOM-Level-2-Traversal-Range-20001113'>DOM Level 2 Traversal and      Range</a>]
      * .
      */
+    @UnsupportedAppUsage
     public int getWhatToShow();
 
 }

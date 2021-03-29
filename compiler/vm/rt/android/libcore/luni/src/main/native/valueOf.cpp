@@ -17,37 +17,46 @@
 #define LOG_TAG "valueOf"
 
 #include "valueOf.h"
-#include "JNIHelp.h"
+
+#include <nativehelper/JNIHelp.h>
+
 #include "JniConstants.h"
 
 template <typename T>
 static jobject valueOf(JNIEnv* env, jclass c, const char* signature, const T& value) {
     static jmethodID valueOfMethod = env->GetStaticMethodID(c, "valueOf", signature);
-    return env->CallStaticObjectMethod(c, valueOfMethod, value);
+    if (env->ExceptionCheck()) {
+        return NULL;
+    }
+    jobject result = env->CallStaticObjectMethod(c, valueOfMethod, value);
+    if (env->ExceptionCheck()) {
+        return NULL;
+    }
+    return result;
 }
 
 jobject booleanValueOf(JNIEnv* env, jboolean value) {
-    return valueOf(env, JniConstants::booleanClass, "(Z)Ljava/lang/Boolean;", value);
+    return valueOf(env, JniConstants::GetBooleanClass(env), "(Z)Ljava/lang/Boolean;", value);
 }
 
 jobject doubleValueOf(JNIEnv* env, jdouble value) {
-    return valueOf(env, JniConstants::doubleClass, "(D)Ljava/lang/Double;", value);
+    return valueOf(env, JniConstants::GetDoubleClass(env), "(D)Ljava/lang/Double;", value);
 }
 
 jobject integerValueOf(JNIEnv* env, jint value) {
-    return valueOf(env, JniConstants::integerClass, "(I)Ljava/lang/Integer;", value);
+    return valueOf(env, JniConstants::GetIntegerClass(env), "(I)Ljava/lang/Integer;", value);
 }
 
 jobject longValueOf(JNIEnv* env, jlong value) {
-    return valueOf(env, JniConstants::longClass, "(J)Ljava/lang/Long;", value);
+    return valueOf(env, JniConstants::GetLongClass(env), "(J)Ljava/lang/Long;", value);
 }
 
 jboolean booleanValue(JNIEnv* env, jobject javaLangBoolean) {
-    static jfieldID fid = env->GetFieldID(JniConstants::booleanClass, "value", "Z");
+    static jfieldID fid = env->GetFieldID(JniConstants::GetBooleanClass(env), "value", "Z");
     return env->GetBooleanField(javaLangBoolean, fid);
 }
 
 jint intValue(JNIEnv* env, jobject javaLangInteger) {
-    static jfieldID fid = env->GetFieldID(JniConstants::integerClass, "value", "I");
+    static jfieldID fid = env->GetFieldID(JniConstants::GetIntegerClass(env), "value", "I");
     return env->GetIntField(javaLangInteger, fid);
 }

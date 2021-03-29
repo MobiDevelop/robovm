@@ -18,18 +18,16 @@
 
 #include <stdlib.h>
 
-#include "JNIHelp.h"
-#include "JniConstants.h"
-#include "ScopedJavaUnicodeString.h"
-#include "jni.h"
+#include <nativehelper/JNIHelp.h>
+#include <nativehelper/jni_macros.h>
+
 #include "unicode/parseerr.h"
 #include "unicode/regex.h"
 
-// ICU documentation: http://icu-project.org/apiref/icu4c/classRegexPattern.html
+#include "JniConstants.h"
+#include "ScopedJavaUnicodeString.h"
 
-static RegexPattern* toRegexPattern(jlong addr) {
-    return reinterpret_cast<RegexPattern*>(static_cast<uintptr_t>(addr));
-}
+// ICU documentation: http://icu-project.org/apiref/icu4c/classRegexPattern.html
 
 static const char* regexDetailMessage(UErrorCode status) {
     // These human-readable error messages were culled from "utypes.h", and then slightly tuned
@@ -63,19 +61,23 @@ static const char* regexDetailMessage(UErrorCode status) {
 }
 
 static void throwPatternSyntaxException(JNIEnv* env, UErrorCode status, jstring pattern, UParseError error) {
-    static jmethodID method = env->GetMethodID(JniConstants::patternSyntaxExceptionClass,
+    static jmethodID method = env->GetMethodID(JniConstants::GetPatternSyntaxExceptionClass(env),
             "<init>", "(Ljava/lang/String;Ljava/lang/String;I)V");
     jstring message = env->NewStringUTF(regexDetailMessage(status));
-    jclass exceptionClass = JniConstants::patternSyntaxExceptionClass;
+    jclass exceptionClass = JniConstants::GetPatternSyntaxExceptionClass(env);
     jobject exception = env->NewObject(exceptionClass, method, message, pattern, error.offset);
     env->Throw(reinterpret_cast<jthrowable>(exception));
 }
 
-extern "C" void Java_java_util_regex_Pattern_closeImpl(JNIEnv*, jclass, jlong addr) {
-    delete toRegexPattern(addr);
+static void Pattern_free(void* addr) {
+    delete reinterpret_cast<icu::RegexPattern*>(addr);
 }
 
-extern "C" jlong Java_java_util_regex_Pattern_compileImpl(JNIEnv* env, jclass, jstring javaRegex, jint flags) {
+static jlong Pattern_getNativeFinalizer(JNIEnv*, jclass) {
+    return reinterpret_cast<jlong>(&Pattern_free);
+}
+
+static jlong Pattern_compileImpl(JNIEnv* env, jclass, jstring javaRegex, jint flags) {
     flags |= UREGEX_ERROR_ON_UNKNOWN_ESCAPES;
 
     UErrorCode status = U_ZERO_ERROR;
@@ -86,10 +88,19 @@ extern "C" jlong Java_java_util_regex_Pattern_compileImpl(JNIEnv* env, jclass, j
     if (!regex.valid()) {
         return 0;
     }
-    UnicodeString& regexString(regex.unicodeString());
-    RegexPattern* result = RegexPattern::compile(regexString, flags, error, status);
+    icu::UnicodeString& regexString(regex.unicodeString());
+    icu::RegexPattern* result = icu::RegexPattern::compile(regexString, flags, error, status);
     if (!U_SUCCESS(status)) {
         throwPatternSyntaxException(env, status, javaRegex, error);
     }
     return static_cast<jlong>(reinterpret_cast<uintptr_t>(result));
+}
+
+static JNINativeMethod gMethods[] = {
+    NATIVE_METHOD(Pattern, compileImpl, "(Ljava/lang/String;I)J"),
+    NATIVE_METHOD(Pattern, getNativeFinalizer, "()J"),
+};
+
+extern "C" void register_java_util_regex_Pattern(JNIEnv* env) {
+    jniRegisterNativeMethods(env, "java/util/regex/Pattern", gMethods, NELEM(gMethods));
 }

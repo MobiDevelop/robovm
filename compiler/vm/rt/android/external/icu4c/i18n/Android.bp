@@ -1,0 +1,78 @@
+// Copyright (C) 2008 The Android Open Source Project
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//
+// Common definitions.
+//
+
+cc_defaults {
+    name: "libicui18n_defaults",
+    srcs: [
+        "*.cpp",
+    ],
+    cflags: [
+        "-D_REENTRANT",
+        "-DU_I18N_IMPLEMENTATION",
+        "-O3",
+        "-fvisibility=hidden",
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-parameter",
+    ],
+    cppflags: [
+        "-std=c++11",
+    ],
+    rtti: true,
+
+    target: {
+        android: {
+            cflags: [
+                "-DANDROID_LINK_SHARED_ICU4C",
+                "-DPIC",
+                "-fPIC",
+            ],
+        },
+        windows: {
+            enabled: true,
+            cflags: [
+                "-Wno-ignored-attributes", // ICU-20356
+                "-Wno-missing-field-initializers", // ICU-20179
+            ],
+        },
+    },
+}
+
+cc_library_headers {
+    name: "libicui18n_headers",
+    host_supported: true,
+    export_include_dirs: ["."],
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
+}
+
+//
+// Build for the host and target (device).
+//
+cc_library_shared {
+    name: "libicui18n",
+    defaults: ["libicui18n_defaults"],
+    host_supported: true,
+    unique_host_soname: true,
+    shared_libs: ["libicuuc"],
+    header_libs: [ "libicui18n_headers" ],
+    export_header_lib_headers: [ "libicui18n_headers" ],
+}

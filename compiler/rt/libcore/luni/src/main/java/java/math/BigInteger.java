@@ -22,6 +22,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Random;
+import libcore.util.NonNull;
+import libcore.util.Nullable;
 
 /**
  * An immutable arbitrary-precision signed integer.
@@ -63,13 +65,13 @@ public class BigInteger extends Number
     transient int sign;
 
     /** The {@code BigInteger} constant 0. */
-    public static final BigInteger ZERO = new BigInteger(0, 0);
+    @NonNull public static final BigInteger ZERO = new BigInteger(0, 0);
 
     /** The {@code BigInteger} constant 1. */
-    public static final BigInteger ONE = new BigInteger(1, 1);
+    @NonNull public static final BigInteger ONE = new BigInteger(1, 1);
 
     /** The {@code BigInteger} constant 10. */
-    public static final BigInteger TEN = new BigInteger(1, 10);
+    @NonNull public static final BigInteger TEN = new BigInteger(1, 10);
 
     /** The {@code BigInteger} constant -1. */
     static final BigInteger MINUS_ONE = new BigInteger(-1, 1);
@@ -92,7 +94,7 @@ public class BigInteger extends Number
     private transient int hashCode = 0;
 
     BigInteger(BigInt bigInt) {
-        if (bigInt == null || bigInt.getNativeBIGNUM() == 0) {
+        if (bigInt == null || !bigInt.hasNativeBignum()) {
             throw new AssertionError();
         }
         setBigInt(bigInt);
@@ -124,7 +126,7 @@ public class BigInteger extends Number
      * @param random is the random number generator to be used.
      * @throws IllegalArgumentException if {@code numBits} < 0.
      */
-    public BigInteger(int numBits, Random random) {
+    public BigInteger(int numBits, @NonNull Random random) {
         if (numBits < 0) {
             throw new IllegalArgumentException("numBits < 0: " + numBits);
         }
@@ -160,7 +162,7 @@ public class BigInteger extends Number
      * @see <a href="http://www.openssl.org/docs/crypto/BN_rand.html">
      *      Specification of random generator used from OpenSSL library</a>
      */
-    public BigInteger(int bitLength, int certainty, Random random) {
+    public BigInteger(int bitLength, int certainty, @NonNull Random random) {
         if (bitLength < 2) {
             throw new ArithmeticException("bitLength < 2: " + bitLength);
         }
@@ -212,7 +214,7 @@ public class BigInteger extends Number
      * @throws NumberFormatException if {@code value} is not a valid
      *     representation of a {@code BigInteger}.
      */
-    public BigInteger(String value) {
+    public BigInteger(@NonNull String value) {
         BigInt bigInt = new BigInt();
         bigInt.putDecString(value);
         setBigInt(bigInt);
@@ -231,7 +233,7 @@ public class BigInteger extends Number
      *     representation of a {@code BigInteger} or if {@code radix <
      *     Character.MIN_RADIX} or {@code radix > Character.MAX_RADIX}.
      */
-    public BigInteger(String value, int radix) {
+    public BigInteger(@NonNull String value, int radix) {
         if (value == null) {
             throw new NullPointerException("value == null");
         }
@@ -266,7 +268,7 @@ public class BigInteger extends Number
      * @throws NumberFormatException if the sign is not one of -1, 0, 1 or if
      *     the sign is zero and the magnitude contains non-zero entries.
      */
-    public BigInteger(int signum, byte[] magnitude) {
+    public BigInteger(int signum, byte @NonNull [] magnitude) {
         if (magnitude == null) {
             throw new NullPointerException("magnitude == null");
         }
@@ -296,7 +298,7 @@ public class BigInteger extends Number
      * @throws NullPointerException if {@code value == null}.
      * @throws NumberFormatException if the length of {@code value} is zero.
      */
-    public BigInteger(byte[] value) {
+    public BigInteger(byte @NonNull [] value) {
         if (value.length == 0) {
             throw new NumberFormatException("value.length == 0");
         }
@@ -361,7 +363,7 @@ public class BigInteger extends Number
     }
 
     /** Returns a {@code BigInteger} whose value is equal to {@code value}. */
-    public static BigInteger valueOf(long value) {
+    @NonNull public static BigInteger valueOf(long value) {
         if (value < 0) {
             if (value != -1) {
                 return new BigInteger(-1, -value);
@@ -378,7 +380,7 @@ public class BigInteger extends Number
      * Returns the two's complement representation of this {@code BigInteger} in
      * a byte array.
      */
-    public byte[] toByteArray() {
+    public byte @NonNull [] toByteArray() {
         return twosComplement();
     }
 
@@ -386,7 +388,7 @@ public class BigInteger extends Number
      * Returns a {@code BigInteger} whose value is the absolute value of {@code
      * this}.
      */
-    public BigInteger abs() {
+    @NonNull public BigInteger abs() {
         BigInt bigInt = getBigInt();
         if (bigInt.sign() >= 0) {
             return this;
@@ -399,7 +401,7 @@ public class BigInteger extends Number
     /**
      * Returns a {@code BigInteger} whose value is the {@code -this}.
      */
-    public BigInteger negate() {
+    @NonNull public BigInteger negate() {
         BigInt bigInt = getBigInt();
         int sign = bigInt.sign();
         if (sign == 0) {
@@ -413,7 +415,7 @@ public class BigInteger extends Number
     /**
      * Returns a {@code BigInteger} whose value is {@code this + value}.
      */
-    public BigInteger add(BigInteger value) {
+    @NonNull public BigInteger add(@NonNull BigInteger value) {
         BigInt lhs = getBigInt();
         BigInt rhs = value.getBigInt();
         if (rhs.sign() == 0) {
@@ -428,7 +430,7 @@ public class BigInteger extends Number
     /**
      * Returns a {@code BigInteger} whose value is {@code this - value}.
      */
-    public BigInteger subtract(BigInteger value) {
+    @NonNull public BigInteger subtract(@NonNull BigInteger value) {
         BigInt lhs = getBigInt();
         BigInt rhs = value.getBigInt();
         if (rhs.sign() == 0) {
@@ -462,7 +464,7 @@ public class BigInteger extends Number
      * @return {@code this >> n} if {@code n >= 0}; {@code this << (-n)}
      *     otherwise
      */
-    public BigInteger shiftRight(int n) {
+    @NonNull public BigInteger shiftRight(int n) {
         return shiftLeft(-n);
     }
 
@@ -479,7 +481,7 @@ public class BigInteger extends Number
      * @return {@code this << n} if {@code n >= 0}; {@code this >> (-n)}.
      *     otherwise
      */
-    public BigInteger shiftLeft(int n) {
+    @NonNull public BigInteger shiftLeft(int n) {
         if (n == 0) {
             return this;
         }
@@ -579,7 +581,7 @@ public class BigInteger extends Number
      * @param n position where the bit in {@code this} has to be set.
      * @throws ArithmeticException if {@code n < 0}.
      */
-    public BigInteger setBit(int n) {
+    @NonNull public BigInteger setBit(int n) {
         prepareJavaRepresentation();
         if (!testBit(n)) {
             return BitLevel.flipBit(this, n);
@@ -599,7 +601,7 @@ public class BigInteger extends Number
      * @param n position where the bit in {@code this} has to be cleared.
      * @throws ArithmeticException if {@code n < 0}.
      */
-    public BigInteger clearBit(int n) {
+    @NonNull public BigInteger clearBit(int n) {
         prepareJavaRepresentation();
         if (testBit(n)) {
             return BitLevel.flipBit(this, n);
@@ -619,7 +621,7 @@ public class BigInteger extends Number
      * @param n position where the bit in {@code this} has to be flipped.
      * @throws ArithmeticException if {@code n < 0}.
      */
-    public BigInteger flipBit(int n) {
+    @NonNull public BigInteger flipBit(int n) {
         prepareJavaRepresentation();
         if (n < 0) {
             throw new ArithmeticException("n < 0: " + n);
@@ -669,7 +671,7 @@ public class BigInteger extends Number
      * <p><b>Implementation Note:</b> Usage of this method is not recommended as
      * the current implementation is not efficient.
      */
-    public BigInteger not() {
+    @NonNull public BigInteger not() {
         this.prepareJavaRepresentation();
         return Logical.not(this);
     }
@@ -683,7 +685,7 @@ public class BigInteger extends Number
      * @param value value to be and'ed with {@code this}.
      * @throws NullPointerException if {@code value == null}.
      */
-    public BigInteger and(BigInteger value) {
+    @NonNull public BigInteger and(@NonNull BigInteger value) {
         this.prepareJavaRepresentation();
         value.prepareJavaRepresentation();
         return Logical.and(this, value);
@@ -698,7 +700,7 @@ public class BigInteger extends Number
      * @param value value to be or'ed with {@code this}.
      * @throws NullPointerException if {@code value == null}.
      */
-    public BigInteger or(BigInteger value) {
+    @NonNull public BigInteger or(@NonNull BigInteger value) {
         this.prepareJavaRepresentation();
         value.prepareJavaRepresentation();
         return Logical.or(this, value);
@@ -713,7 +715,7 @@ public class BigInteger extends Number
      * @param value value to be xor'ed with {@code this}
      * @throws NullPointerException if {@code value == null}
      */
-    public BigInteger xor(BigInteger value) {
+    @NonNull public BigInteger xor(@NonNull BigInteger value) {
         this.prepareJavaRepresentation();
         value.prepareJavaRepresentation();
         return Logical.xor(this, value);
@@ -730,7 +732,7 @@ public class BigInteger extends Number
      * @param value value to be not'ed and then and'ed with {@code this}.
      * @throws NullPointerException if {@code value == null}.
      */
-    public BigInteger andNot(BigInteger value) {
+    @NonNull public BigInteger andNot(@NonNull BigInteger value) {
         this.prepareJavaRepresentation();
         value.prepareJavaRepresentation();
         return Logical.andNot(this, value);
@@ -799,7 +801,7 @@ public class BigInteger extends Number
      * @param value value to be compared with {@code this}.
      * @throws NullPointerException if {@code value == null}.
      */
-    public int compareTo(BigInteger value) {
+    public int compareTo(@NonNull BigInteger value) {
         return BigInt.cmp(getBigInt(), value.getBigInt());
     }
 
@@ -809,7 +811,7 @@ public class BigInteger extends Number
      * @param value value to be used to compute the minimum with {@code this}.
      * @throws NullPointerException if {@code value == null}.
      */
-    public BigInteger min(BigInteger value) {
+    @NonNull public BigInteger min(@NonNull BigInteger value) {
         return this.compareTo(value) == -1 ? this : value;
     }
 
@@ -819,25 +821,25 @@ public class BigInteger extends Number
      * @param value value to be used to compute the maximum with {@code this}
      * @throws NullPointerException if {@code value == null}
      */
-    public BigInteger max(BigInteger value) {
+    @NonNull public BigInteger max(@NonNull BigInteger value) {
         return this.compareTo(value) == 1 ? this : value;
     }
 
     @Override
     public int hashCode() {
-        if (hashCode != 0) {
-            return hashCode;
+        if (hashCode == 0) {
+            prepareJavaRepresentation();
+            int hash = 0;
+            for (int i = 0; i < numberLength; ++i) {
+                hash = hash * 33 + digits[i];
+            }
+            hashCode = hash * sign;
         }
-        prepareJavaRepresentation();
-        for (int i = 0; i < numberLength; ++i) {
-            hashCode = hashCode * 33 + digits[i];
-        }
-        hashCode = hashCode * sign;
         return hashCode;
     }
 
     @Override
-    public boolean equals(Object x) {
+    public boolean equals(@Nullable Object x) {
         if (this == x) {
             return true;
         }
@@ -852,7 +854,7 @@ public class BigInteger extends Number
      * form.
      */
     @Override
-    public String toString() {
+    @NonNull public String toString() {
         return getBigInt().decString();
     }
 
@@ -865,7 +867,7 @@ public class BigInteger extends Number
      *
      * @param radix base to be used for the string representation.
      */
-    public String toString(int radix) {
+    @NonNull public String toString(int radix) {
         if (radix == 10) {
             return getBigInt().decString();
         } else {
@@ -882,7 +884,7 @@ public class BigInteger extends Number
      * @param value value with which the greatest common divisor is computed.
      * @throws NullPointerException if {@code value == null}.
      */
-    public BigInteger gcd(BigInteger value) {
+    @NonNull public BigInteger gcd(@NonNull BigInteger value) {
         return new BigInteger(BigInt.gcd(getBigInt(), value.getBigInt()));
     }
 
@@ -891,7 +893,7 @@ public class BigInteger extends Number
      *
      * @throws NullPointerException if {@code value == null}.
      */
-    public BigInteger multiply(BigInteger value) {
+    @NonNull public BigInteger multiply(@NonNull BigInteger value) {
         return new BigInteger(BigInt.product(getBigInt(), value.getBigInt()));
     }
 
@@ -900,7 +902,7 @@ public class BigInteger extends Number
      *
      * @throws ArithmeticException if {@code exp < 0}.
      */
-    public BigInteger pow(int exp) {
+    @NonNull public BigInteger pow(int exp) {
         if (exp < 0) {
             throw new ArithmeticException("exp < 0: " + exp);
         }
@@ -917,7 +919,7 @@ public class BigInteger extends Number
      * @see #divide
      * @see #remainder
      */
-    public BigInteger[] divideAndRemainder(BigInteger divisor) {
+    public @NonNull BigInteger @NonNull [] divideAndRemainder(@NonNull BigInteger divisor) {
         BigInt divisorBigInt = divisor.getBigInt();
         BigInt quotient = new BigInt();
         BigInt remainder = new BigInt();
@@ -933,7 +935,7 @@ public class BigInteger extends Number
      * @throws NullPointerException if {@code divisor == null}.
      * @throws ArithmeticException if {@code divisor == 0}.
      */
-    public BigInteger divide(BigInteger divisor) {
+    @NonNull public BigInteger divide(@NonNull BigInteger divisor) {
         BigInt quotient = new BigInt();
         BigInt.division(getBigInt(), divisor.getBigInt(), quotient, null);
         return new BigInteger(quotient);
@@ -948,7 +950,7 @@ public class BigInteger extends Number
      * @throws NullPointerException if {@code divisor == null}.
      * @throws ArithmeticException if {@code divisor == 0}.
      */
-    public BigInteger remainder(BigInteger divisor) {
+    @NonNull public BigInteger remainder(@NonNull BigInteger divisor) {
         BigInt remainder = new BigInt();
         BigInt.division(getBigInt(), divisor.getBigInt(), null, remainder);
         return new BigInteger(remainder);
@@ -965,7 +967,7 @@ public class BigInteger extends Number
      * @throws ArithmeticException if {@code m < 0 or} if {@code this} is not
      *     relatively prime to {@code m}
      */
-    public BigInteger modInverse(BigInteger m) {
+    @NonNull public BigInteger modInverse(@NonNull BigInteger m) {
         if (m.signum() <= 0) {
             throw new ArithmeticException("modulus not positive");
         }
@@ -985,7 +987,7 @@ public class BigInteger extends Number
      * @throws ArithmeticException if {@code modulus < 0} or if {@code exponent < 0} and
      *     not relatively prime to {@code modulus}.
      */
-    public BigInteger modPow(BigInteger exponent, BigInteger modulus) {
+    @NonNull public BigInteger modPow(@NonNull BigInteger exponent, @NonNull BigInteger modulus) {
         if (modulus.signum() <= 0) {
             throw new ArithmeticException("modulus.signum() <= 0");
         }
@@ -1009,7 +1011,7 @@ public class BigInteger extends Number
      * @throws NullPointerException if {@code m == null}.
      * @throws ArithmeticException if {@code m < 0}.
      */
-    public BigInteger mod(BigInteger m) {
+    @NonNull public BigInteger mod(@NonNull BigInteger m) {
         if (m.signum() <= 0) {
             throw new ArithmeticException("m.signum() <= 0");
         }
@@ -1042,7 +1044,7 @@ public class BigInteger extends Number
      * @return smallest integer > {@code this} which is probably prime.
      * @throws ArithmeticException if {@code this < 0}.
      */
-    public BigInteger nextProbablePrime() {
+    @NonNull public BigInteger nextProbablePrime() {
         if (sign < 0) {
             throw new ArithmeticException("sign < 0");
         }
@@ -1058,7 +1060,7 @@ public class BigInteger extends Number
      * @return probably prime random {@code BigInteger} instance.
      * @throws IllegalArgumentException if {@code bitLength < 2}.
      */
-    public static BigInteger probablePrime(int bitLength, Random random) {
+    @NonNull public static BigInteger probablePrime(int bitLength, @NonNull Random random) {
         return new BigInteger(bitLength, 100, random);
     }
 

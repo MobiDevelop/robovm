@@ -21,6 +21,7 @@ import java.nio.FloatBuffer;
 import java.util.Arrays;
 
 import org.robovm.rt.VM;
+import org.robovm.rt.bro.ArrayUtils;
 import org.robovm.rt.bro.Struct;
 import org.robovm.rt.bro.annotation.MachineSizedFloat;
 import org.robovm.rt.bro.annotation.StructMember;
@@ -138,7 +139,7 @@ public final class MachineSizedFloatPtr extends Struct<MachineSizedFloatPtr> {
         if (_sizeOf() == 4) {
             asFloatBuffer(count).get(dst, offset, count);
         } else {
-            Arrays.checkOffsetAndCount(dst.length, offset, count);
+            ArrayUtils.checkOffsetAndCount(dst.length, offset, count);
             DoubleBuffer buf = asDoubleBuffer(count);
             for (int i = 0; i < count; i++) {
                 dst[i + offset] = (float) buf.get();
@@ -171,7 +172,7 @@ public final class MachineSizedFloatPtr extends Struct<MachineSizedFloatPtr> {
         if (_sizeOf() == 4) {
             asFloatBuffer(count).put(src, offset, count);
         } else {
-            Arrays.checkOffsetAndCount(src.length, offset, count);
+            ArrayUtils.checkOffsetAndCount(src.length, offset, count);
             DoubleBuffer buf = asDoubleBuffer(count);
             for (int i = 0; i < count; i++) {
                 buf.put(src[i + offset]);
@@ -219,7 +220,7 @@ public final class MachineSizedFloatPtr extends Struct<MachineSizedFloatPtr> {
         if (_sizeOf() == 8) {
             asDoubleBuffer(count).get(dst, offset, count);
         } else {
-            Arrays.checkOffsetAndCount(dst.length, offset, count);
+            ArrayUtils.checkOffsetAndCount(dst.length, offset, count);
             FloatBuffer buf = asFloatBuffer(count);
             for (int i = 0; i < count; i++) {
                 dst[i + offset] = buf.get();
@@ -252,7 +253,7 @@ public final class MachineSizedFloatPtr extends Struct<MachineSizedFloatPtr> {
         if (_sizeOf() == 4) {
             asDoubleBuffer(count).put(src, offset, count);
         } else {
-            Arrays.checkOffsetAndCount(src.length, offset, count);
+            ArrayUtils.checkOffsetAndCount(src.length, offset, count);
             FloatBuffer buf = asFloatBuffer(count);
             for (int i = 0; i < count; i++) {
                 buf.put((float) src[i + offset]);

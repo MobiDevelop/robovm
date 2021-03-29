@@ -6,6 +6,7 @@
 
 package org.xml.sax.helpers;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EmptyStackException;
@@ -113,6 +114,7 @@ public class NamespaceSupport
     /**
      * An empty enumeration.
      */
+    @UnsupportedAppUsage
     private static final Enumeration EMPTY_ENUMERATION = Collections.enumeration(Collections.emptyList());
 
 
@@ -517,9 +519,13 @@ public class NamespaceSupport
     // Internal state.
     ////////////////////////////////////////////////////////////////////
 
+    @UnsupportedAppUsage
     private Context contexts[];
+    @UnsupportedAppUsage
     private Context currentContext;
+    @UnsupportedAppUsage
     private int contextPos;
+    @UnsupportedAppUsage
     private boolean namespaceDeclUris;
 
 
@@ -544,6 +550,7 @@ public class NamespaceSupport
     /**
      * Create the root-level Namespace context.
      */
+    @UnsupportedAppUsage
     Context ()
     {
         copyTables();

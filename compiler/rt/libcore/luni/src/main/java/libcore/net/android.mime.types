@@ -1,0 +1,99 @@
+
+###############################################################################
+#
+#  Android-specific MIME type mappings
+#
+#  MIME types that Android has manually added or historically chosen to
+#  override, and which take precidence over any upstream mime.types.
+#
+###############################################################################
+
+application/epub+zip epub
+application/pkix-cert cer
+application/rss+xml rss
+application/vnd.apple.mpegurl m3u8
+application/vnd.ms-pki.stl stl
+application/vnd.ms-powerpoint pot
+application/vnd.ms-wpl wpl
+application/vnd.stardivision.impress sdp
+application/vnd.stardivision.writer vor
+application/vnd.youtube.yt yt
+application/x-android-drm-fl fl
+application/x-flac flac
+application/x-font pcf
+application/x-mpegurl m3u m3u8
+application/x-pem-file pem
+application/x-pkcs12 p12 pfx
+application/x-webarchive webarchive
+application/x-webarchive-xml webarchivexml
+# Note: We rely here on the fact that we're declaring this mapping before the
+# line "text/xml xml" below, because we don't want to change the mapping from
+# extension "xml" back to MIME type "text/xml".
+application/x-wifi-config xml
+application/x-x509-server-cert crt
+application/x-x509-user-cert crt
+
+audio/3gpp 3gpp
+audio/aac-adts aac
+audio/imelody imy
+audio/midi ota rtttl xmf
+audio/mobile-xmf mxmf
+audio/mp4 m4a
+audio/mpegurl m3u
+audio/sp-midi smf
+audio/x-matroska mka
+audio/x-pn-realaudio ra
+
+image/bmp bmp
+image/heic heic
+image/heic-sequence heics
+image/heif heif hif
+image/heif-sequence heifs
+image/ico cur
+image/webp webp
+image/x-adobe-dng dng
+image/x-fuji-raf raf
+image/x-icon ico
+image/x-nikon-nrw nrw
+image/x-panasonic-rw2 rw2
+image/x-pentax-pef pef
+image/x-samsung-srw srw
+image/x-sony-arw arw
+
+text/comma-separated-values csv
+text/plain diff po
+text/rtf rtf
+text/text phps
+text/xml xml
+text/x-vcard vcf
+
+video/3gpp2 3gpp2 3g2
+video/3gpp 3gpp
+video/avi avi
+video/m4v m4v
+video/mp2p mpeg
+video/mp2ts ts
+video/MP2T m2ts MTS
+video/x-webex wrf
+
+# Special cases where Android has a strong opinion about mappings, so we
+# define them very last and use "!" to ensure that we force the mapping
+# in both directions.
+application/pgp-signature pgp!
+application/x-x509-ca-cert crt!
+audio/aac aac!
+audio/basic snd!
+audio/flac flac!
+audio/midi rtx!
+audio/mpeg mp3! m4a m4r
+audio/x-mpegurl m3u8! m3u!
+image/jpeg jpg!
+image/x-ms-bmp bmp!
+text/plain txt!
+text/x-c++hdr hpp!
+text/x-c++src cpp!
+video/3gpp 3gpp!
+video/mpeg mpeg!
+video/quicktime mov!
+video/vnd.youtube.yt yt
+video/x-matroska mkv!

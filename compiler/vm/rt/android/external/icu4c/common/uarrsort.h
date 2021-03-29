@@ -1,12 +1,14 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
 *******************************************************************************
 *
-*   Copyright (C) 2003, International Business Machines
+*   Copyright (C) 2003-2013, International Business Machines
 *   Corporation and others.  All Rights Reserved.
 *
 *******************************************************************************
 *   file name:  uarrsort.h
-*   encoding:   US-ASCII
+*   encoding:   UTF-8
 *   tab size:   8 (not used)
 *   indentation:4
 *
@@ -80,5 +82,22 @@ uprv_int32Comparator(const void *context, const void *left, const void *right);
  */
 U_CAPI int32_t U_EXPORT2
 uprv_uint32Comparator(const void *context, const void *left, const void *right);
+
+/**
+ * Much like Java Collections.binarySearch(list, key, comparator).
+ *
+ * Except: Java documents "If the list contains multiple elements equal to
+ * the specified object, there is no guarantee which one will be found."
+ *
+ * This version here will return the largest index of any equal item,
+ * for use in stable sorting.
+ *
+ * @return the index>=0 where the item was found:
+ *         the largest such index, if multiple, for stable sorting;
+ *         or the index<0 for inserting the item at ~index in sorted order
+ */
+U_CAPI int32_t U_EXPORT2
+uprv_stableBinarySearch(char *array, int32_t length, void *item, int32_t itemSize,
+                        UComparator *cmp, const void *context);
 
 #endif

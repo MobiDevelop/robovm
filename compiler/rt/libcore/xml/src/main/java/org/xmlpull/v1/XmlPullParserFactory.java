@@ -3,28 +3,12 @@
 
 package org.xmlpull.v1;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.Map;
 
 /**
  * This class is used to create implementations of XML Pull Parser defined in XMPULL V1 API.
- * The name of actual factory class will be determined based on several parameters.
- * It works similar to JAXP but tailored to work in J2ME environments
- * (no access to system properties or file system) so name of parser class factory to use
- * and its class used for loading (no class loader - on J2ME no access to context class loaders)
- * must be passed explicitly. If no name of parser factory was passed (or is null)
- * it will try to find name by searching in CLASSPATH for
- * META-INF/services/org.xmlpull.v1.XmlPullParserFactory resource that should contain
- * a comma separated list of class names of factories or parsers to try (in order from
- * left to the right). If none found, it will throw an exception.
- *
- * <br /><strong>NOTE:</strong>In J2SE or J2EE environments, you may want to use
- * <code>newInstance(property, classLoaderCtx)</code>
- * where first argument is
- * <code>System.getProperty(XmlPullParserFactory.PROPERTY_NAME)</code>
- * and second is <code>Thread.getContextClassLoader().getClass()</code> .
  *
  * @see XmlPullParser
  *
@@ -33,49 +17,32 @@ import java.util.Iterator;
  */
 
 public class XmlPullParserFactory {
-    /** used as default class to server as context class in newInstance() */
-    final static Class referenceContextClass;
 
-    static {
-        XmlPullParserFactory f = new XmlPullParserFactory();
-        referenceContextClass = f.getClass();
-    }
-
-    /** Name of the system or midlet property that should be used for
-     a system property containing a comma separated list of factory
-     or parser class names (value:
-     org.xmlpull.v1.XmlPullParserFactory). */
-
-
-    public static final String PROPERTY_NAME =
-        "org.xmlpull.v1.XmlPullParserFactory";
-
-    private static final String RESOURCE_NAME =
-        "/META-INF/services/" + PROPERTY_NAME;
-
-
-    // public static final String DEFAULT_PROPERTY =
-    //    "org.xmlpull.xpp3.XmlPullParser,org.kxml2.io.KXmlParser";
-
-
+    public static final String PROPERTY_NAME = "org.xmlpull.v1.XmlPullParserFactory";
     protected ArrayList parserClasses;
-    protected String classNamesLocation;
-
     protected ArrayList serializerClasses;
 
+    /** Unused, but we have to keep it because it's public API. */
+    protected String classNamesLocation = null;
 
     // features are kept there
-    protected HashMap features = new HashMap();
-
+    // TODO: This can't be made final because it's a public API.
+    protected HashMap<String, Boolean> features = new HashMap<String, Boolean>();
 
     /**
      * Protected constructor to be called by factory implementations.
      */
-
     protected XmlPullParserFactory() {
+        parserClasses = new ArrayList<String>();
+        serializerClasses = new ArrayList<String>();
+
+        try {
+            parserClasses.add(Class.forName("com.android.org.kxml2.io.KXmlParser"));
+            serializerClasses.add(Class.forName("com.android.org.kxml2.io.KXmlSerializer"));
+        } catch (ClassNotFoundException e) {
+            throw new AssertionError();
+        }
     }
-
-
 
     /**
      * Set the features to be set when XML Pull Parser is created by this factory.
@@ -84,7 +51,6 @@ public class XmlPullParserFactory {
      * @param name string with URI identifying feature
      * @param state if true feature will be set; if false will be ignored
      */
-
     public void setFeature(String name, boolean state) throws XmlPullParserException {
         features.put(name, state);
     }
@@ -98,9 +64,8 @@ public class XmlPullParserFactory {
      * @return The value of named feature.
      *     Unknown features are <string>always</strong> returned as false
      */
-
-    public boolean getFeature (String name) {
-        Boolean value = (Boolean) features.get(name);
+    public boolean getFeature(String name) {
+        Boolean value = features.get(name);
         return value != null ? value.booleanValue() : false;
     }
 
@@ -112,7 +77,6 @@ public class XmlPullParserFactory {
      * @param awareness true if the parser produced by this code
      *    will provide support for XML namespaces;  false otherwise.
      */
-
     public void setNamespaceAware(boolean awareness) {
         features.put (XmlPullParser.FEATURE_PROCESS_NAMESPACES, awareness);
     }
@@ -125,11 +89,9 @@ public class XmlPullParserFactory {
      * @return  true if the factory is configured to produce parsers
      *    which are namespace aware; false otherwise.
      */
-
     public boolean isNamespaceAware() {
-        return getFeature (XmlPullParser.FEATURE_PROCESS_NAMESPACES);
+        return getFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES);
     }
-
 
     /**
      * Specifies that the parser produced by this factory will be validating
@@ -139,9 +101,8 @@ public class XmlPullParserFactory {
      *
      * @param validating - if true the parsers created by this factory  must be validating.
      */
-
     public void setValidating(boolean validating) {
-        features.put (XmlPullParser.FEATURE_VALIDATION, validating);
+        features.put(XmlPullParser.FEATURE_VALIDATION, validating);
     }
 
     /**
@@ -153,7 +114,7 @@ public class XmlPullParserFactory {
      */
 
     public boolean isValidating() {
-        return getFeature (XmlPullParser.FEATURE_VALIDATION);
+        return getFeature(XmlPullParser.FEATURE_VALIDATION);
     }
 
     /**
@@ -161,42 +122,81 @@ public class XmlPullParserFactory {
      * using the currently configured factory features.
      *
      * @return A new instance of a XML Pull Parser.
-     * @throws XmlPullParserException if a parser cannot be created which satisfies the
-     * requested configuration.
      */
-
     public XmlPullParser newPullParser() throws XmlPullParserException {
-
-        if (parserClasses == null) throw new XmlPullParserException
-                ("Factory initialization was incomplete - has not tried "+classNamesLocation);
-
-        if (parserClasses.size() == 0) throw new XmlPullParserException
-                ("No valid parser classes found in "+classNamesLocation);
-
-        final StringBuilder issues = new StringBuilder();
-
-        for (int i = 0; i < parserClasses.size(); i++) {
-            final Class ppClass = (Class) parserClasses.get(i);
-            try {
-                final XmlPullParser pp = (XmlPullParser) ppClass.newInstance();
-
-                for (Iterator iter = features.keySet().iterator(); iter.hasNext(); ) {
-                    final String key = (String) iter.next();
-                    final Boolean value = (Boolean) features.get(key);
-                    if(value != null && value.booleanValue()) {
-                        pp.setFeature(key, true);
-                    }
-                }
-                return pp;
-
-            } catch(Exception ex) {
-                issues.append (ppClass.getName () + ": "+ ex.toString ()+"; ");
+        final XmlPullParser pp = getParserInstance();
+        for (Map.Entry<String, Boolean> entry : features.entrySet()) {
+            // NOTE: This test is needed for compatibility reasons. We guarantee
+            // that we only set a feature on a parser if its value is true.
+            if (entry.getValue()) {
+                pp.setFeature(entry.getKey(), entry.getValue());
             }
         }
 
-        throw new XmlPullParserException ("could not create parser: "+issues);
+        return pp;
     }
 
+    private XmlPullParser getParserInstance() throws XmlPullParserException {
+        ArrayList<Exception> exceptions = null;
+
+        if (parserClasses != null && !parserClasses.isEmpty()) {
+            exceptions = new ArrayList<Exception>();
+            for (Object o : parserClasses) {
+                try {
+                    if (o != null) {
+                        Class<?> parserClass = (Class<?>) o;
+                        return (XmlPullParser) parserClass.newInstance();
+                    }
+                } catch (InstantiationException e) {
+                    exceptions.add(e);
+                } catch (IllegalAccessException e) {
+                    exceptions.add(e);
+                } catch (ClassCastException e) {
+                    exceptions.add(e);
+                }
+            }
+        }
+
+        throw newInstantiationException("Invalid parser class list", exceptions);
+    }
+
+    private XmlSerializer getSerializerInstance() throws XmlPullParserException {
+        ArrayList<Exception> exceptions = null;
+
+        if (serializerClasses != null && !serializerClasses.isEmpty()) {
+            exceptions = new ArrayList<Exception>();
+            for (Object o : serializerClasses) {
+                try {
+                    if (o != null) {
+                        Class<?> serializerClass = (Class<?>) o;
+                        return (XmlSerializer) serializerClass.newInstance();
+                    }
+                } catch (InstantiationException e) {
+                    exceptions.add(e);
+                } catch (IllegalAccessException e) {
+                    exceptions.add(e);
+                } catch (ClassCastException e) {
+                    exceptions.add(e);
+                }
+            }
+        }
+
+        throw newInstantiationException("Invalid serializer class list", exceptions);
+    }
+
+    private static XmlPullParserException newInstantiationException(String message,
+            ArrayList<Exception> exceptions) {
+        if (exceptions == null || exceptions.isEmpty()) {
+            return new XmlPullParserException(message);
+        } else {
+            XmlPullParserException exception = new XmlPullParserException(message);
+            for (Exception ex : exceptions) {
+                exception.addSuppressed(ex);
+            }
+
+            return exception;
+        }
+    }
 
     /**
      * Creates a new instance of a XML Serializer.
@@ -209,137 +209,26 @@ public class XmlPullParserFactory {
      */
 
     public XmlSerializer newSerializer() throws XmlPullParserException {
-
-        if (serializerClasses == null) {
-            throw new XmlPullParserException
-                ("Factory initialization incomplete - has not tried "+classNamesLocation);
-        }
-        if(serializerClasses.size() == 0) {
-            throw new XmlPullParserException
-                ("No valid serializer classes found in "+classNamesLocation);
-        }
-
-        final StringBuilder issues = new StringBuilder ();
-
-        for (int i = 0; i < serializerClasses.size (); i++) {
-            final Class ppClass = (Class) serializerClasses.get(i);
-            try {
-                final XmlSerializer ser = (XmlSerializer) ppClass.newInstance();
-
-                return ser;
-
-            } catch(Exception ex) {
-                issues.append (ppClass.getName () + ": "+ ex.toString ()+"; ");
-            }
-        }
-
-        throw new XmlPullParserException ("could not create serializer: "+issues);
+        return getSerializerInstance();
     }
 
     /**
-     * Create a new instance of a PullParserFactory that can be used
-     * to create XML pull parsers (see class description for more
-     * details).
-     *
-     * @return a new instance of a PullParserFactory, as returned by newInstance (null, null);
+     * Creates a new instance of a PullParserFactory that can be used
+     * to create XML pull parsers. The factory will always return instances
+     * of Android's built-in {@link XmlPullParser} and {@link XmlSerializer}.
      */
     public static XmlPullParserFactory newInstance () throws XmlPullParserException {
-        return newInstance(null, null);
+        return new XmlPullParserFactory();
     }
 
-    public static XmlPullParserFactory newInstance (String classNames, Class context)
+    /**
+     * Creates a factory that always returns instances of Android's built-in
+     * {@link XmlPullParser} and {@link XmlSerializer} implementation. This
+     * <b>does not</b> support factories capable of creating arbitrary parser
+     * and serializer implementations. Both arguments to this method are unused.
+     */
+    public static XmlPullParserFactory newInstance (String unused, Class unused2)
         throws XmlPullParserException {
-
-        /*
-        if (context == null) {
-            //NOTE: make sure context uses the same class loader as API classes
-            //      this is the best we can do without having access to context classloader in J2ME
-            //      if API is in the same classloader as implementation then this will work
-            context = referenceContextClass;
-        }
-
-        String  classNamesLocation = null;
-
-        if (classNames == null || classNames.length() == 0 || "DEFAULT".equals(classNames)) {
-            try {
-                InputStream is = context.getResourceAsStream (RESOURCE_NAME);
-
-                if (is == null) throw new XmlPullParserException
-                        ("resource not found: "+RESOURCE_NAME
-                             +" make sure that parser implementing XmlPull API is available");
-                final StringBuilder sb = new StringBuilder();
-
-                while (true) {
-                    final int ch = is.read();
-                    if (ch < 0) break;
-                    else if (ch > ' ')
-                        sb.append((char) ch);
-                }
-                is.close ();
-
-                classNames = sb.toString ();
-            }
-            catch (Exception e) {
-                throw new XmlPullParserException (null, null, e);
-            }
-            classNamesLocation = "resource "+RESOURCE_NAME+" that contained '"+classNames+"'";
-        } else {
-            classNamesLocation =
-                "parameter classNames to newInstance() that contained '"+classNames+"'";
-        }
-        */
-        classNames = "org.kxml2.io.KXmlParser,org.kxml2.io.KXmlSerializer";
-
-        XmlPullParserFactory factory = null;
-        final ArrayList parserClasses = new ArrayList();
-        final ArrayList serializerClasses = new ArrayList();
-        int pos = 0;
-
-        while (pos < classNames.length ()) {
-            int cut = classNames.indexOf (',', pos);
-
-            if (cut == -1) cut = classNames.length ();
-            final String name = classNames.substring (pos, cut);
-
-            Class candidate = null;
-            Object instance = null;
-
-            try {
-                candidate = Class.forName (name);
-                // necessary because of J2ME .class issue
-                instance = candidate.newInstance ();
-            }
-            catch (Exception e) {}
-
-            if (candidate != null) {
-                boolean recognized = false;
-                if (instance instanceof XmlPullParser) {
-                    parserClasses.add(candidate);
-                    recognized = true;
-                }
-                if (instance instanceof XmlSerializer) {
-                    serializerClasses.add(candidate);
-                    recognized = true;
-                }
-                if (instance instanceof XmlPullParserFactory) {
-                    if (factory == null) {
-                        factory = (XmlPullParserFactory) instance;
-                    }
-                    recognized = true;
-                }
-                if (!recognized) {
-                    throw new XmlPullParserException ("incompatible class: "+name);
-                }
-            }
-            pos = cut + 1;
-        }
-
-        if (factory == null) {
-            factory = new XmlPullParserFactory ();
-        }
-        factory.parserClasses = parserClasses;
-        factory.serializerClasses = serializerClasses;
-        factory.classNamesLocation = "org.kxml2.io.kXmlParser,org.kxml2.io.KXmlSerializer";
-        return factory;
+        return newInstance();
     }
 }

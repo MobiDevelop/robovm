@@ -22,11 +22,13 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 import libcore.util.BasicLruCache;
-import libcore.util.ZoneInfoDB;
+import libcore.timezone.ZoneInfoDB;
 
 /**
  * Provides access to ICU's time zone name data.
+ * @hide
  */
 public final class TimeZoneNames {
     private static final String[] availableTimeZoneIds = TimeZone.getAvailableIDs();
@@ -42,30 +44,15 @@ public final class TimeZoneNames {
     public static final int NAME_COUNT = 5;
 
     private static final ZoneStringsCache cachedZoneStrings = new ZoneStringsCache();
-    static {
-        // Ensure that we pull in the zone strings for the root locale, en_US, and the
-        // user's default locale. (All devices must support the root locale and en_US,
-        // and they're used for various system things like HTTP headers.) Pre-populating
-        // the cache is especially useful on Android because we'll share this via the Zygote.
-        cachedZoneStrings.get(Locale.ROOT);
-        cachedZoneStrings.get(Locale.US);
-        cachedZoneStrings.get(Locale.getDefault());
-    }
 
+    /** @hide */
     public static class ZoneStringsCache extends BasicLruCache<Locale, String[][]> {
-        // De-duplicate the strings (http://b/2672057).
-        private final HashMap<String, String> internTable = new HashMap<String, String>();
-
         public ZoneStringsCache() {
-            // We make room for all the time zones known to the system, since each set of strings
-            // isn't particularly large (and we remove duplicates), but is currently (Honeycomb)
-            // really expensive to compute.
-            // If you change this, you might want to change the scope of the intern table too.
-            super(availableTimeZoneIds.length);
+            super(5); // Room for a handful of locales.
         }
 
         @Override protected String[][] create(Locale locale) {
-            long start = System.currentTimeMillis();
+            long start = System.nanoTime();
 
             // Set up the 2D array used to hold the names. The first column contains the Olson ids.
             String[][] result = new String[availableTimeZoneIds.length][5];
@@ -73,23 +60,51 @@ public final class TimeZoneNames {
                 result[i][0] = availableTimeZoneIds[i];
             }
 
-            long nativeStart = System.currentTimeMillis();
-            fillZoneStrings(locale.toString(), result);
-            long nativeEnd = System.currentTimeMillis();
+            long nativeStart = System.nanoTime();
+            fillZoneStrings(locale.toLanguageTag(), result);
+            long nativeEnd = System.nanoTime();
 
+            addOffsetStrings(result);
             internStrings(result);
             // Ending up in this method too often is an easy way to make your app slow, so we ensure
             // it's easy to tell from the log (a) what we were doing, (b) how long it took, and
             // (c) that it's all ICU's fault.
-            long end = System.currentTimeMillis();
-            long nativeDuration = nativeEnd - nativeStart;
-            long duration = end - start;
+            long end = System.nanoTime();
+            long nativeDuration = TimeUnit.NANOSECONDS.toMillis(nativeEnd - nativeStart);
+            long duration = TimeUnit.NANOSECONDS.toMillis(end - start);
             System.logI("Loaded time zone names for \"" + locale + "\" in " + duration + "ms" +
-                    " (" + nativeDuration + "ms in ICU)");
+                        " (" + nativeDuration + "ms in ICU)");
             return result;
         }
 
-        private synchronized void internStrings(String[][] result) {
+        /**
+         * Generate offset strings for cases where we don't have a name. Note that this is a
+         * potentially slow operation, as we need to load the timezone data for all affected
+         * time zones.
+         */
+        private void addOffsetStrings(String[][] result) {
+            for (int i = 0; i < result.length; ++i) {
+                TimeZone tz = null;
+                for (int j = 1; j < NAME_COUNT; ++j) {
+                    if (result[i][j] != null) {
+                        continue;
+                    }
+                    if (tz == null) {
+                        tz = TimeZone.getTimeZone(result[i][0]);
+                    }
+                    int offsetMillis = tz.getRawOffset();
+                    if (j == LONG_NAME_DST || j == SHORT_NAME_DST) {
+                        offsetMillis += tz.getDSTSavings();
+                    }
+                    result[i][j] = TimeZone.createGmtOffsetString(
+                            /* includeGmt */ true, /*includeMinuteSeparator */true, offsetMillis);
+                }
+            }
+        }
+
+        // De-duplicate the strings (http://b/2672057).
+        private void internStrings(String[][] result) {
+            HashMap<String, String> internTable = new HashMap<String, String>();
             for (int i = 0; i < result.length; ++i) {
                 for (int j = 1; j < NAME_COUNT; ++j) {
                     String original = result[i][j];
@@ -137,29 +152,6 @@ public final class TimeZoneNames {
             locale = Locale.getDefault();
         }
         return cachedZoneStrings.get(locale);
-    }
-
-    /**
-     * Returns an array containing the time zone ids in use in the country corresponding to
-     * the given locale. This is not necessary for Java API, but is used by telephony as a
-     * fallback. We retrieve these strings from zone.tab rather than icu4c because the latter
-     * supplies them in alphabetical order where zone.tab has them in a kind of "importance"
-     * order (as defined in the zone.tab header).
-     */
-    public static String[] forLocale(Locale locale) {
-        String countryCode = locale.getCountry();
-        ArrayList<String> ids = new ArrayList<String>();
-        for (String line : ZoneInfoDB.getInstance().getZoneTab().split("\n")) {
-            if (line.startsWith(countryCode)) {
-                int olsonIdStart = line.indexOf('\t', 4) + 1;
-                int olsonIdEnd = line.indexOf('\t', olsonIdStart);
-                if (olsonIdEnd == -1) {
-                    olsonIdEnd = line.length(); // Not all zone.tab lines have a comment.
-                }
-                ids.add(line.substring(olsonIdStart, olsonIdEnd));
-            }
-        }
-        return ids.toArray(new String[ids.size()]);
     }
 
     private static native void fillZoneStrings(String locale, String[][] result);

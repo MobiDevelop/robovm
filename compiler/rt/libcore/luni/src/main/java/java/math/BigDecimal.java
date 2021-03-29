@@ -937,8 +937,14 @@ public class BigDecimal extends Number implements Comparable<BigDecimal>, Serial
         }
         /* Let be: this = [u1,s1] and multiplicand = [u2,s2] so:
          * this x multiplicand = [ s1 * s2 , s1 + s2 ] */
-        if(this.bitLength + multiplicand.bitLength < 64) {
-            return valueOf(this.smallValue*multiplicand.smallValue, safeLongToInt(newScale));
+        if (this.bitLength + multiplicand.bitLength < 64) {
+            long unscaledValue = this.smallValue * multiplicand.smallValue;
+            // b/19185440 Case where result should be +2^63 but unscaledValue overflowed to -2^63
+            boolean longMultiplicationOverflowed = (unscaledValue == Long.MIN_VALUE) &&
+                    (Math.signum(smallValue) * Math.signum(multiplicand.smallValue) > 0);
+            if (!longMultiplicationOverflowed) {
+                return valueOf(unscaledValue, safeLongToInt(newScale));
+            }
         }
         return new BigDecimal(this.getUnscaledValue().multiply(
                 multiplicand.getUnscaledValue()), safeLongToInt(newScale));
@@ -1025,12 +1031,23 @@ public class BigDecimal extends Number implements Comparable<BigDecimal>, Serial
         }
 
         long diffScale = ((long)this.scale - divisor.scale) - scale;
+
+        // Check whether the diffScale will fit into an int. See http://b/17393664.
+        if (bitLength(diffScale) > 32) {
+            throw new ArithmeticException(
+                    "Unable to perform divisor / dividend scaling: the difference in scale is too" +
+                            " big (" + diffScale + ")");
+        }
+
         if(this.bitLength < 64 && divisor.bitLength < 64 ) {
             if(diffScale == 0) {
-                return dividePrimitiveLongs(this.smallValue,
-                        divisor.smallValue,
-                        scale,
-                        roundingMode );
+                // http://b/26105053 - corner case: Long.MIN_VALUE / (-1) overflows a long
+                if (this.smallValue != Long.MIN_VALUE || divisor.smallValue != -1) {
+                    return dividePrimitiveLongs(this.smallValue,
+                            divisor.smallValue,
+                            scale,
+                            roundingMode);
+                }
             } else if(diffScale > 0) {
                 if(diffScale < MathUtils.LONG_POWERS_OF_TEN.length &&
                         divisor.bitLength + LONG_POWERS_OF_TEN_BIT_LENGTH[(int)diffScale] < 64) {
@@ -1077,7 +1094,7 @@ public class BigDecimal extends Number implements Comparable<BigDecimal>, Serial
         if(scaledDivisor.bitLength() < 63) { // 63 in order to avoid out of long after *2
             long rem = remainder.longValue();
             long divisor = scaledDivisor.longValue();
-            compRem = longCompareTo(Math.abs(rem) * 2,Math.abs(divisor));
+            compRem = compareForRounding(rem, divisor);
             // To look if there is a carry
             compRem = roundingBehavior(quotient.testBit(0) ? 1 : 0,
                     sign * (5 + compRem), roundingMode);
@@ -1105,8 +1122,7 @@ public class BigDecimal extends Number implements Comparable<BigDecimal>, Serial
         int sign = Long.signum( scaledDividend ) * Long.signum( scaledDivisor );
         if (remainder != 0) {
             // Checking if:  remainder * 2 >= scaledDivisor
-            int compRem;                                      // 'compare to remainder'
-            compRem = longCompareTo(Math.abs(remainder) * 2,Math.abs(scaledDivisor));
+            int compRem = compareForRounding(remainder, scaledDivisor); // 'compare to remainder'
             // To look if there is a carry
             quotient += roundingBehavior(((int)quotient) & 1,
                     sign * (5 + compRem),
@@ -1332,7 +1348,7 @@ public class BigDecimal extends Number implements Comparable<BigDecimal>, Serial
     public BigDecimal divideToIntegralValue(BigDecimal divisor) {
         BigInteger integralValue; // the integer of result
         BigInteger powerOfTen; // some power of ten
-        BigInteger quotAndRem[] = {getUnscaledValue()};
+
         long newScale = (long)this.scale - divisor.scale;
         long tempScale = 0;
         int i = 1;
@@ -1357,7 +1373,7 @@ public class BigDecimal extends Number implements Comparable<BigDecimal>, Serial
             integralValue = getUnscaledValue().multiply(powerOfTen).divide( divisor.getUnscaledValue() );
             // To strip trailing zeros approximating to the preferred scale
             while (!integralValue.testBit(0)) {
-                quotAndRem = integralValue.divideAndRemainder(TEN_POW[i]);
+                BigInteger[] quotAndRem = integralValue.divideAndRemainder(TEN_POW[i]);
                 if ((quotAndRem[1].signum() == 0)
                         && (tempScale - i >= newScale)) {
                     tempScale -= i;
@@ -2018,9 +2034,7 @@ public class BigDecimal extends Number implements Comparable<BigDecimal>, Serial
         long newScale = scale;
 
         if (isZero()) {
-            // Preserve RI compatibility, so BigDecimal.equals (which checks
-            // value *and* scale) continues to work.
-            return this;
+            return new BigDecimal(BigInteger.ZERO, 0);
         }
         BigInteger strippedBI = getUnscaledValue();
         BigInteger[] quotAndRem;
@@ -2113,8 +2127,8 @@ public class BigDecimal extends Number implements Comparable<BigDecimal>, Serial
         if (x instanceof BigDecimal) {
             BigDecimal x1 = (BigDecimal) x;
             return x1.scale == scale
-                   && (bitLength < 64 ? (x1.smallValue == smallValue)
-                    : intVal.equals(x1.intVal));
+                    && x1.bitLength == bitLength
+                    && (bitLength < 64 ? (x1.smallValue == smallValue) : x1.intVal.equals(intVal));
         }
         return false;
     }
@@ -2692,9 +2706,56 @@ public class BigDecimal extends Number implements Comparable<BigDecimal>, Serial
         setUnscaledValue(integerAndFraction[0]);
     }
 
-    private static int longCompareTo(long value1, long value2) {
+    /**
+     * Returns -1, 0, and 1 if {@code value1 < value2}, {@code value1 == value2},
+     * and {@code value1 > value2}, respectively, when comparing without regard
+     * to the values' sign.
+     *
+     * <p>Note that this implementation deals correctly with Long.MIN_VALUE,
+     * whose absolute magnitude is larger than any other {@code long} value.
+     */
+    private static int compareAbsoluteValues(long value1, long value2) {
+        // Map long values to the range -1 .. Long.MAX_VALUE so that comparison
+        // of absolute magnitude can be done using regular long arithmetics.
+        // This deals correctly with Long.MIN_VALUE, whose absolute magnitude
+        // is larger than any other long value, and which is mapped to
+        // Long.MAX_VALUE here.
+        // Values that only differ by sign get mapped to the same value, for
+        // example both +3 and -3 get mapped to +2.
+        value1 = Math.abs(value1) - 1;
+        value2 = Math.abs(value2) - 1;
+        // Unlike Long.compare(), we guarantee to return specifically -1 and +1
         return value1 > value2 ? 1 : (value1 < value2 ? -1 : 0);
     }
+
+    /**
+     * Compares {@code n} against {@code 0.5 * d} in absolute terms (ignoring sign)
+     * and with arithmetics that are safe against overflow or loss of precision.
+     * Returns -1 if {@code n} is less than {@code 0.5 * d}, 0 if {@code n == 0.5 * d},
+     * or +1 if {@code n > 0.5 * d} when comparing the absolute values under such
+     * arithmetics.
+     */
+    private static int compareForRounding(long n, long d) {
+        long halfD = d / 2; //  rounds towards 0
+        if (n == halfD || n == -halfD) {
+            // In absolute terms: Because n == halfD, we know that 2 * n + lsb == d
+            // for some lsb value 0 or 1. This means that n == d/2 (result 0) if
+            // lsb is 0, or n < d/2 (result -1) if lsb is 1. In either case, the
+            // result is -lsb.
+            // Since we're calculating in absolute terms, we need the absolute lsb
+            // (d & 1) as opposed to the signed lsb (d % 2) which would be -1 for
+            // negative odd values of d.
+            int lsb = (int) d & 1;
+            return -lsb; // returns 0 or -1
+        } else {
+            // In absolute terms, either 2 * n + 1 < d (in the case of n < halfD),
+            // or 2 * n > d (in the case of n > halfD).
+            // In either case, comparing n against halfD gets the right result
+            // -1 or +1, respectively.
+            return compareAbsoluteValues(n, halfD);
+        }
+    }
+
     /**
      * This method implements an efficient rounding for numbers which unscaled
      * value fits in the type {@code long}.
@@ -2716,7 +2777,7 @@ public class BigDecimal extends Number implements Comparable<BigDecimal>, Serial
         // If the discarded fraction is non-zero perform rounding
         if (fraction != 0) {
             // To check if the discarded fraction >= 0.5
-            compRem = longCompareTo(Math.abs(fraction) * 2, sizeOfFraction);
+            compRem = compareForRounding(fraction, sizeOfFraction);
             // To look if there is a carry
             integer += roundingBehavior( ((int)integer) & 1,
                     Long.signum(fraction) * (5 + compRem),

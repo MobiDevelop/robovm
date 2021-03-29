@@ -16,6 +16,8 @@
 
 package org.apache.harmony.xml;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
+import dalvik.annotation.optimization.ReachabilitySensitive;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -44,6 +46,9 @@ class ExpatParser {
     private static final int BUFFER_SIZE = 8096; // in bytes
 
     /** Pointer to XML_Parser instance. */
+    // A few native methods taking the pointer value are static; @ReachabilitySensitive is
+    // necessary to ensure the Java object is kept reachable sufficiently long in these cases.
+    @ReachabilitySensitive
     private long pointer;
 
     private boolean inStartElement = false;
@@ -52,6 +57,7 @@ class ExpatParser {
 
     private final Locator locator = new ExpatLocator();
 
+    @UnsupportedAppUsage
     private final ExpatReader xmlReader;
 
     private final String publicId;
@@ -59,6 +65,7 @@ class ExpatParser {
 
     private final String encoding;
 
+    @UnsupportedAppUsage
     private final ExpatAttributes attributes = new CurrentAttributes();
 
     private static final String OUTSIDE_START_ELEMENT
@@ -76,6 +83,7 @@ class ExpatParser {
     /**
      * Constructs a new parser with the specified encoding.
      */
+    @UnsupportedAppUsage
     /*package*/ ExpatParser(String encoding, ExpatReader xmlReader,
             boolean processNamespaces, String publicId, String systemId) {
         this.publicId = publicId;
@@ -421,6 +429,7 @@ class ExpatParser {
      * @param length of characters to use
      * @throws SAXException if an error occurs during parsing
      */
+    @UnsupportedAppUsage
     /*package*/ void append(char[] xml, int offset, int length)
             throws SAXException {
         try {
@@ -453,6 +462,7 @@ class ExpatParser {
      * @param length of bytes to use
      * @throws SAXException if an error occurs during parsing
      */
+    @UnsupportedAppUsage
     /*package*/ void append(byte[] xml, int offset, int length)
             throws SAXException {
         try {
@@ -538,6 +548,7 @@ class ExpatParser {
      *
      * @throws SAXException if the xml is incomplete
      */
+    @UnsupportedAppUsage
     /*package*/ void finish() throws SAXException {
         try {
             appendString(this.pointer, "", true);
@@ -598,6 +609,7 @@ class ExpatParser {
      * Clones the current attributes so they can be used outside of
      * startElement().
      */
+    @UnsupportedAppUsage
     /*package*/ Attributes cloneAttributes() {
         if (!inStartElement) {
             throw new IllegalStateException(OUTSIDE_START_ELEMENT);
@@ -618,6 +630,9 @@ class ExpatParser {
      * Used for cloned attributes.
      */
     private static class ClonedAttributes extends ExpatAttributes {
+    // TODO: Can we please remove this? It appears unused, and the finalizer
+    // asynchronously invalidates the result returned by getPointer() at a
+    // largely unpredictable time. b/70989581
 
         private static final Attributes EMPTY = new ClonedAttributes(0, 0, 0);
 
@@ -763,6 +778,7 @@ class ExpatParser {
      */
     private static class EntityParser extends ExpatParser {
 
+        @UnsupportedAppUsage
         private int depth = 0;
 
         private EntityParser(String encoding, ExpatReader xmlReader,

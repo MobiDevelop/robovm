@@ -16,50 +16,77 @@
 
 package java.nio;
 
+import java.io.Closeable;
 import java.io.FileDescriptor;
+import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
+import java.util.Set;
+
+import static android.system.OsConstants.*;
+import dalvik.annotation.compat.UnsupportedAppUsage;
+import sun.misc.Cleaner;
+import sun.nio.ch.DirectBuffer;
+import sun.nio.ch.FileChannelImpl;
 
 /**
  * @hide internal use only
  */
+@libcore.api.CorePlatformApi
 public final class NioUtils {
     private NioUtils() {
     }
 
+    @UnsupportedAppUsage
+    @libcore.api.CorePlatformApi
     public static void freeDirectBuffer(ByteBuffer buffer) {
         if (buffer == null) {
             return;
         }
-        ((DirectByteBuffer) buffer).free();
+
+        DirectByteBuffer dbb = (DirectByteBuffer) buffer;
+        // Run the cleaner early, if one is defined.
+        if (dbb.cleaner != null) {
+            dbb.cleaner.clean();
+        }
+
+        dbb.memoryRef.free();
     }
 
     /**
      * Returns the int file descriptor from within the given FileChannel 'fc'.
      */
     public static FileDescriptor getFD(FileChannel fc) {
-        return ((FileChannelImpl) fc).getFD();
+        return ((FileChannelImpl) fc).fd;
     }
 
     /**
      * Helps bridge between io and nio.
      */
-    public static FileChannel newFileChannel(Object stream, FileDescriptor fd, int mode) {
-        return new FileChannelImpl(stream, fd, mode);
+    public static FileChannel newFileChannel(Closeable ioObject, FileDescriptor fd, int mode) {
+        boolean readable = (mode & (O_RDONLY | O_RDWR | O_SYNC)) != 0;
+        boolean writable = (mode & (O_WRONLY | O_RDWR | O_SYNC)) != 0;
+        boolean append = (mode & O_APPEND) != 0;
+        return FileChannelImpl.open(fd, null, readable, writable, append, ioObject);
     }
 
     /**
      * Exposes the array backing a non-direct ByteBuffer, even if the ByteBuffer is read-only.
      * Normally, attempting to access the array backing a read-only buffer throws.
      */
+    @UnsupportedAppUsage
+    @libcore.api.CorePlatformApi
     public static byte[] unsafeArray(ByteBuffer b) {
-        return ((ByteArrayBuffer) b).backingArray;
+        return b.array();
     }
 
     /**
      * Exposes the array offset for the array backing a non-direct ByteBuffer,
      * even if the ByteBuffer is read-only.
      */
+    @UnsupportedAppUsage
+    @libcore.api.CorePlatformApi
     public static int unsafeArrayOffset(ByteBuffer b) {
-        return ((ByteArrayBuffer) b).arrayOffset;
+        return b.arrayOffset();
     }
 }

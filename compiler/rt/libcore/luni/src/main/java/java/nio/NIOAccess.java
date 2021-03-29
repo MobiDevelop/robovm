@@ -16,25 +16,26 @@
 
 package java.nio;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
+
 /**
  * This class is used via JNI by code in frameworks/base/.
+ * @hide
  */
-final class NIOAccess {
+// @VisibleForTesting : was default
+public final class NIOAccess {
 
     /**
      * Returns the underlying native pointer to the data of the given
      * Buffer starting at the Buffer's current position, or 0 if the
-     * Buffer is not backed by native heap storage. Note that this is
-     * different than what the Harmony implementation calls a "base
-     * address."
-     *
-     * @param b the Buffer to be queried
-     * @return the native pointer to the Buffer's data at its current
-     * position, or 0 if there is none
+     * Buffer is not backed by native heap storage.
+     * @hide
      */
-    static long getBasePointer(Buffer b) {
-        long address = b.effectiveDirectAddress;
-        if (address == 0) {
+    // @VisibleForTesting : was default
+    @UnsupportedAppUsage
+    public static long getBasePointer(Buffer b) {
+        long address = b.address;
+        if (address == 0L) {
             return 0L;
         }
         return address + (b.position << b._elementSizeShift);
@@ -43,11 +44,8 @@ final class NIOAccess {
     /**
      * Returns the underlying Java array containing the data of the
      * given Buffer, or null if the Buffer is not backed by a Java array.
-     *
-     * @param b the Buffer to be queried
-     * @return the Java array containing the Buffer's data, or null if
-     * there is none
      */
+    @UnsupportedAppUsage
     static Object getBaseArray(Buffer b) {
         return b.hasArray() ? b.array() : null;
     }
@@ -58,10 +56,8 @@ final class NIOAccess {
      * the actual start of the data. The start of the data takes into
      * account the Buffer's current position. This method is only
      * meaningful if getBaseArray() returns non-null.
-     *
-     * @param b the Buffer to be queried
-     * @return the data offset in bytes to the start of this Buffer's data
      */
+    @UnsupportedAppUsage
     static int getBaseArrayOffset(Buffer b) {
         return b.hasArray() ? ((b.arrayOffset() + b.position) << b._elementSizeShift) : 0;
     }

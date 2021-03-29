@@ -23,25 +23,15 @@
     <build>
         <resources>
             <resource><directory>robovm/src/main/resources</directory></resource>
-            <resource><directory>libcore/crypto/src/main/resources</directory></resource>
-            <resource><directory>libcore/dalvik/src/main/resources</directory></resource>
-            <resource><directory>libcore/json/src/main/resources</directory></resource>
-            <resource><directory>libcore/libdvm/src/main/resources</directory></resource>
-            <resource><directory>libcore/luni/src/main/resources</directory></resource>
-            <resource><directory>libcore/xml/src/main/resources</directory></resource>
-            <resource><directory>external/apache-xml/src/main/resources</directory></resource>
-            <resource><directory>external/bouncycastle/bcpkix/src/main/resources</directory></resource>
-            <resource><directory>external/bouncycastle/bcprov/src/main/resources</directory></resource>
-            <resource><directory>external/javasqlite/src/main/resources</directory></resource>
-            <resource><directory>external/okhttp/src/main/resources</directory></resource>
+            <resource><directory>libcore/ojluni/src/main/resources</directory></resource>
             <resource>
-                <directory>libcore/luni/src/main/java</directory>
+                <directory>libcore/ojluni/src/main/java</directory>
                 <includes>
                     <include>**/*.properties</include>
                 </includes>
             </resource>
             <resource>
-                <directory>external/apache-xml/src/main/java</directory>
+                <directory>libcore/luni/src/main/java</directory>
                 <includes>
                     <include>**/*.properties</include>
                 </includes>
@@ -54,6 +44,7 @@
                     <include>**/*.java</include>
                 </includes>
             </resource>
+            <resource><directory>android_icu4j/src/main/resources</directory></resource>
         </resources>
 
         <plugins>
@@ -84,34 +75,27 @@
                             <sources>
                                 <source>${project.build.directory}/generated-sources/filtered-java</source>
                                 <source>robovm/src/main/java</source>
-                                <source>libcore/crypto/src/main/java</source>
+
                                 <source>libcore/dalvik/src/main/java</source>
-                                <source>libcore/json/src/main/java</source>
-                                <source>libcore/libdvm/src/main/java</source>
+                                <source>libcore/libart/src/main/java</source>
                                 <source>libcore/luni/src/main/java</source>
+                                <source>libcore/ojluni/src/main/java</source>
+                                <source>libcore/json/src/main/java</source>
                                 <source>libcore/xml/src/main/java</source>
-                                <source>external/apache-http/src</source>
-                                <source>external/apache-xml/src/main/java</source>
-                                <source>external/bouncycastle/bcpkix/src/main/java</source>
-                                <source>external/bouncycastle/bcprov/src/main/java</source>
+                                <source>conscrypt/src/main/java</source>
+                                <source>android_icu4j/src/main/java</source>
+
+                                <source>external/bouncycastle/bcprov/src</source>
+                                <source>external/okhttp/okhttp/src/main/java</source>
+                                <source>external/okhttp/android/src/main/java</source>
+                                <source>external/okhttp/okhttp-android-support/src/main/java</source>
+                                <source>external/okhttp/okhttp-urlconnection/src/main/java</source>
+                                <source>external/okhttp/okio/okio/src/main/java</source>
                                 <source>external/javasqlite/src/main/java</source>
-                                <source>external/okhttp/src/main/java</source>
-                                <source>external/okhttp/android/main/java</source>
                             </sources>
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <configuration>
-                    <excludes>
-                        <exclude>org/bouncycastle/**/*</exclude>
-                        <exclude>org/conscrypt/**/*</exclude>
-                        <exclude>com/squareup/**/*</exclude>
-                    </excludes>
-                </configuration>
             </plugin>
 
             <plugin>
@@ -125,35 +109,6 @@
                     <bootclasspath>""</bootclasspath>
                     <detectJavaApiLink>false</detectJavaApiLink>
                 </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <relocations>
-                                <relocation>
-                                    <pattern>org.bouncycastle</pattern>
-                                    <shadedPattern>com.android.org.bouncycastle</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>org.conscrypt</pattern>
-                                    <shadedPattern>com.android.org.conscrypt</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>com.squareup</pattern>
-                                    <shadedPattern>com.android</shadedPattern>
-                                </relocation>
-                            </relocations>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>

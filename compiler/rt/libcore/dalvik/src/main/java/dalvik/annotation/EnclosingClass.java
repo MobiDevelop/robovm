@@ -22,7 +22,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * A "system annotation" used to provide part of the InnerClasses attribute.
+ * A system annotation used to provide part of the {@code InnerClasses} attribute.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.ANNOTATION_TYPE)

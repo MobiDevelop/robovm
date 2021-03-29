@@ -16,6 +16,7 @@
 
 package org.json;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -48,6 +49,7 @@ import java.util.List;
  */
 public class JSONArray {
 
+    @UnsupportedAppUsage
     private final List<Object> values;
 
     /**
@@ -187,6 +189,17 @@ public class JSONArray {
     }
 
     /**
+     * Same as {@link #put}, with added validity checks.
+     */
+    void checkedPut(Object value) throws JSONException {
+        if (value instanceof Number) {
+            JSON.checkDouble(((Number) value).doubleValue());
+        }
+
+        put(value);
+    }
+
+    /**
      * Sets the value at {@code index} to {@code value}, null padding this array
      * to the required length if necessary. If a value already exists at {@code
      * index}, it will be replaced.
@@ -279,7 +292,7 @@ public class JSONArray {
             }
             return value;
         } catch (IndexOutOfBoundsException e) {
-            throw new JSONException("Index " + index + " out of range [0.." + values.size() + ")");
+            throw new JSONException("Index " + index + " out of range [0.." + values.size() + ")", e);
         }
     }
 
@@ -596,6 +609,7 @@ public class JSONArray {
         return stringer.toString();
     }
 
+    @UnsupportedAppUsage
     void writeTo(JSONStringer stringer) throws JSONException {
         stringer.array();
         for (Object value : values) {

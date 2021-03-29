@@ -1,3 +1,5 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
 ********************************************************************************
 *   Copyright (C) 2010-2012, International Business Machines
@@ -96,26 +98,15 @@ public:
      */
     UBool next(FieldPosition& fp);
 
-    // BEGIN android-added
-    /**
-     * Returns the data.  If dest is null, returns the length of the data.
-     * Otherwise, if capacity is insufficient, returns the negative of the
-     * length of the data.  Otherwise, copies data into dest and returns
-     * the length of the data.
-     * @internal
-     */
-    int32_t getData(int32_t *dest, int32_t capacity) const;
-   // END android-added
-
 private:
-    friend class FieldPositionIteratorHandler;
-
     /**
      * Sets the data used by the iterator, and resets the position.
      * Returns U_ILLEGAL_ARGUMENT_ERROR in status if the data is not valid 
      * (length is not a multiple of 3, or start >= limit for any run).
      */
     void setData(UVector32 *adopt, UErrorCode& status);
+
+    friend class FieldPositionIteratorHandler;
 
     UVector32 *data;
     int32_t pos;

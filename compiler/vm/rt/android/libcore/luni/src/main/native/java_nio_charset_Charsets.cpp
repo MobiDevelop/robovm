@@ -16,9 +16,7 @@
 
 #define LOG_TAG "String"
 
-#include "JNIHelp.h"
-#include "JniConstants.h"
-#include "ScopedPrimitiveArray.h"
+#include "nativehelper/ScopedPrimitiveArray.h"
 #include "jni.h"
 #include "unicode/utf16.h"
 

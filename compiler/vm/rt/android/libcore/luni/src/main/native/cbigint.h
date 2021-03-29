@@ -18,7 +18,7 @@
 #if !defined(cbigint_h)
 #define cbigint_h
 
-#include "JNIHelp.h"
+#include <nativehelper/JNIHelp.h>
 
 #include <sys/types.h>
 #include <sys/param.h>

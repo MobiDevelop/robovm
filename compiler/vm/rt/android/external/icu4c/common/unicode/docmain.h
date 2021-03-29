@@ -1,3 +1,5 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /********************************************************************
  * COPYRIGHT: 
  * Copyright (c) 1997-2012, International Business Machines Corporation and
@@ -86,6 +88,11 @@
  *     <td>icu::UnicodeSet</td>
  *   </tr>
  *   <tr>
+ *     <td>Maps from Unicode Code Points to Integer Values</td>
+ *     <td>ucptrie.h, umutablecptrie.h</td>
+ *     <td>C API</td>
+ *   </tr>
+ *   <tr>
  *     <td>Maps from Strings to Integer Values</td>
  *     <td>(no C API)</td>
  *     <td>icu::BytesTrie, icu::UCharsTrie</td>
@@ -93,6 +100,11 @@
  *   <tr>
  *     <td>Codepage Conversion</td>
  *     <td>ucnv.h, ucnvsel.hb</td>
+ *     <td>C API</td>
+ *   </tr>
+ *   <tr>
+ *     <td>Codepage Detection</td>
+ *     <td>ucsdet.h</td>
  *     <td>C API</td>
  *   </tr>
  *   <tr>
@@ -132,8 +144,8 @@
  *   </tr>
  *   <tr>
  *     <td>Number Formatting</td>
- *     <td>unum.h</td>
- *     <td>icu::NumberFormat</td>
+ *     <td>unumberformatter.h, unum.h</td>
+ *     <td>icu::number::NumberFormatter (ICU 60+) or icu::NumberFormat (older versions)</td>
  *   </tr>
  *   <tr>
  *     <td>Number Spellout<br/>(Rule Based Number Formatting)</td>
@@ -147,7 +159,7 @@
  *   </tr>
  *   <tr>
  *     <td>Bidirectional Algorithm</td>
- *     <td>ubidi.h</td>
+ *     <td>ubidi.h, ubiditransform.h</td>
  *     <td>C API</td>
  *   </tr>
  *   <tr>
@@ -201,9 +213,9 @@
  *     <td>C API</td>
  *   </tr>
  *   <tr>
- *     <td>Layout Engine/Complex Text Layout</td>
- *     <td>loengine.h</td>
- *     <td>icu::LayoutEngine,icu::ParagraphLayout</td>
+ *     <td>Paragraph Layout / Complex Text Layout</td>
+ *     <td>playout.h</td>
+ *     <td>icu::ParagraphLayout</td>
  *   </tr>
  *   <tr>
  *     <td>ICU I/O</td>

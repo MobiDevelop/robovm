@@ -120,11 +120,17 @@ final class NativeBN {
 
 
     public static native void BN_generate_prime_ex(long ret, int bits, boolean safe,
-                                                   long add, long rem, long cb);
+                                                   long add, long rem);
     // int BN_generate_prime_ex(BIGNUM *ret, int bits, int safe,
     //         const BIGNUM *add, const BIGNUM *rem, BN_GENCB *cb);
 
-    public static native boolean BN_is_prime_ex(long p, int nchecks, long cb);
-    // int BN_is_prime_ex(const BIGNUM *p, int nchecks, BN_CTX *ctx, BN_GENCB *cb);
+    public static native boolean BN_primality_test(long candidate, int checks,
+                                                   boolean do_trial_division);
+    // int BN_primality_test(int *is_probably_prime, const BIGNUM *candidate, int checks,
+    //                       BN_CTX *ctx, int do_trial_division, BN_GENCB *cb);
+    // Returns *is_probably_prime on success and throws an exception on error.
+
+    public static native long getNativeFinalizer();
+    // &BN_free
 
 }

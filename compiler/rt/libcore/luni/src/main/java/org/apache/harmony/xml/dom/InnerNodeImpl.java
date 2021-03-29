@@ -18,7 +18,7 @@ package org.apache.harmony.xml.dom;
 
 import java.util.ArrayList;
 import java.util.List;
-import libcore.util.Objects;
+import java.util.Objects;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.DocumentFragment;
 import org.w3c.dom.Node;
@@ -262,6 +262,6 @@ public abstract class InnerNodeImpl extends LeafNodeImpl {
      * may be {@code null}.
      */
     private static boolean matchesNameOrWildcard(String pattern, String s) {
-        return "*".equals(pattern) || Objects.equal(pattern, s);
+        return "*".equals(pattern) || Objects.equals(pattern, s);
     }
 }

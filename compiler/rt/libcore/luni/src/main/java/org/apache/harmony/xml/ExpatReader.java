@@ -16,6 +16,7 @@
 
 package org.apache.harmony.xml;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -40,6 +41,7 @@ public class ExpatReader implements XMLReader {
      * ExpatParser accesses these fields directly during parsing. The user
      * should be able to safely change them during parsing.
      */
+    @UnsupportedAppUsage
     /*package*/ ContentHandler contentHandler;
     /*package*/ DTDHandler dtdHandler;
     /*package*/ EntityResolver entityResolver;
@@ -62,6 +64,10 @@ public class ExpatReader implements XMLReader {
                 = BASE_URI + "external-general-entities";
         private static final String EXTERNAL_PARAMETER_ENTITIES
                 = BASE_URI + "external-parameter-entities";
+    }
+
+    @UnsupportedAppUsage
+    public ExpatReader() {
     }
 
     public boolean getFeature(String name)

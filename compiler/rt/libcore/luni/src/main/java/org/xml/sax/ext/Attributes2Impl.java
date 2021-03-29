@@ -5,6 +5,7 @@
 
 package org.xml.sax.ext;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import libcore.util.EmptyArray;
 import org.xml.sax.Attributes;
 import org.xml.sax.helpers.AttributesImpl;
@@ -37,7 +38,9 @@ import org.xml.sax.helpers.AttributesImpl;
  */
 public class Attributes2Impl extends AttributesImpl implements Attributes2
 {
+    @UnsupportedAppUsage
     private boolean[] declared;
+    @UnsupportedAppUsage
     private boolean[] specified;
 
 

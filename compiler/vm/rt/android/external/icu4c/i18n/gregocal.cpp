@@ -1,7 +1,9 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
 *******************************************************************************
-* Copyright (C) 1997-2012, International Business Machines Corporation and    *
-* others. All Rights Reserved.                                                *
+* Copyright (C) 1997-2016, International Business Machines Corporation and
+* others. All Rights Reserved.
 *******************************************************************************
 *
 * File GREGOCAL.CPP
@@ -539,8 +541,8 @@ int32_t GregorianCalendar::handleComputeMonthStart(int32_t eyear, int32_t month,
     }
 
     UBool isLeap = eyear%4 == 0;
-    int32_t y = eyear-1;
-    int32_t julianDay = 365*y + ClockMath::floorDivide(y, 4) + (kJan1_1JulianDay - 3);
+    int64_t y = (int64_t)eyear-1;
+    int64_t julianDay = 365*y + ClockMath::floorDivide(y, (int64_t)4) + (kJan1_1JulianDay - 3);
 
     nonConstThis->fIsGregorian = (eyear >= fGregorianCutoverYear);
 #if defined (U_DEBUG_CAL)
@@ -570,7 +572,7 @@ int32_t GregorianCalendar::handleComputeMonthStart(int32_t eyear, int32_t month,
         julianDay += isLeap?kLeapNumDays[month]:kNumDays[month];
     }
 
-    return julianDay;
+    return static_cast<int32_t>(julianDay);
 }
 
 int32_t GregorianCalendar::handleGetMonthLength(int32_t extendedYear, int32_t month)  const
@@ -850,6 +852,7 @@ GregorianCalendar::roll(UCalendarDateFields field, int32_t amount, UErrorCode& s
                         inCutoverMonth = TRUE;
                     }
             }
+            break;
         default:
             ;
         }
@@ -1264,11 +1267,14 @@ GregorianCalendar::getType() const {
     return "gregorian";
 }
 
-const UDate     GregorianCalendar::fgSystemDefaultCentury        = DBL_MIN;
-const int32_t   GregorianCalendar::fgSystemDefaultCenturyYear    = -1;
-
-UDate           GregorianCalendar::fgSystemDefaultCenturyStart       = DBL_MIN;
-int32_t         GregorianCalendar::fgSystemDefaultCenturyStartYear   = -1;
+/**
+ * The system maintains a static default century start date and Year.  They are
+ * initialized the first time they are used.  Once the system default century date 
+ * and year are set, they do not change.
+ */
+static UDate           gSystemDefaultCenturyStart       = DBL_MIN;
+static int32_t         gSystemDefaultCenturyStartYear   = -1;
+static icu::UInitOnce  gSystemDefaultCenturyInit        = U_INITONCE_INITIALIZER;
 
 
 UBool GregorianCalendar::haveDefaultCentury() const
@@ -1276,78 +1282,36 @@ UBool GregorianCalendar::haveDefaultCentury() const
     return TRUE;
 }
 
-UDate GregorianCalendar::defaultCenturyStart() const
-{
-    return internalGetDefaultCenturyStart();
-}
-
-int32_t GregorianCalendar::defaultCenturyStartYear() const
-{
-    return internalGetDefaultCenturyStartYear();
-}
-
-UDate
-GregorianCalendar::internalGetDefaultCenturyStart() const
-{
-    // lazy-evaluate systemDefaultCenturyStart
-    UBool needsUpdate;
-    UMTX_CHECK(NULL, (fgSystemDefaultCenturyStart == fgSystemDefaultCentury), needsUpdate);
-
-    if (needsUpdate) {
-        initializeSystemDefaultCentury();
-    }
-
-    // use defaultCenturyStart unless it's the flag value;
-    // then use systemDefaultCenturyStart
-
-    return fgSystemDefaultCenturyStart;
-}
-
-int32_t
-GregorianCalendar::internalGetDefaultCenturyStartYear() const
-{
-    // lazy-evaluate systemDefaultCenturyStartYear
-    UBool needsUpdate;
-    UMTX_CHECK(NULL, (fgSystemDefaultCenturyStart == fgSystemDefaultCentury), needsUpdate);
-
-    if (needsUpdate) {
-        initializeSystemDefaultCentury();
-    }
-
-    // use defaultCenturyStart unless it's the flag value;
-    // then use systemDefaultCenturyStartYear
-
-    return fgSystemDefaultCenturyStartYear;
-}
-
-void
-GregorianCalendar::initializeSystemDefaultCentury()
+static void U_CALLCONV
+initializeSystemDefaultCentury()
 {
     // initialize systemDefaultCentury and systemDefaultCenturyYear based
     // on the current time.  They'll be set to 80 years before
     // the current time.
     UErrorCode status = U_ZERO_ERROR;
-    Calendar *calendar = new GregorianCalendar(status);
-    if (calendar != NULL && U_SUCCESS(status))
-    {
-        calendar->setTime(Calendar::getNow(), status);
-        calendar->add(UCAL_YEAR, -80, status);
+    GregorianCalendar calendar(status);
+    if (U_SUCCESS(status)) {
+        calendar.setTime(Calendar::getNow(), status);
+        calendar.add(UCAL_YEAR, -80, status);
 
-        UDate    newStart =  calendar->getTime(status);
-        int32_t  newYear  =  calendar->get(UCAL_YEAR, status);
-        umtx_lock(NULL);
-        if (fgSystemDefaultCenturyStart == fgSystemDefaultCentury)
-        {
-            fgSystemDefaultCenturyStartYear = newYear;
-            fgSystemDefaultCenturyStart = newStart;
-        }
-        umtx_unlock(NULL);
-        delete calendar;
+        gSystemDefaultCenturyStart = calendar.getTime(status);
+        gSystemDefaultCenturyStartYear = calendar.get(UCAL_YEAR, status);
     }
     // We have no recourse upon failure unless we want to propagate the failure
     // out.
 }
 
+UDate GregorianCalendar::defaultCenturyStart() const {
+    // lazy-evaluate systemDefaultCenturyStart
+    umtx_initOnce(gSystemDefaultCenturyInit, &initializeSystemDefaultCentury);
+    return gSystemDefaultCenturyStart;
+}
+
+int32_t GregorianCalendar::defaultCenturyStartYear() const {
+    // lazy-evaluate systemDefaultCenturyStartYear
+    umtx_initOnce(gSystemDefaultCenturyInit, &initializeSystemDefaultCentury);
+    return gSystemDefaultCenturyStartYear;
+}
 
 U_NAMESPACE_END
 

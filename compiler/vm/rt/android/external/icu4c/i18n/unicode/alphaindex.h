@@ -1,7 +1,9 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
 *******************************************************************************
 *
-*   Copyright (C) 2011-2013 International Business Machines
+*   Copyright (C) 2011-2014 International Business Machines
 *   Corporation and others.  All Rights Reserved.
 *
 *******************************************************************************
@@ -13,9 +15,9 @@
 #include "unicode/utypes.h"
 #include "unicode/uobject.h"
 #include "unicode/locid.h"
+#include "unicode/unistr.h"
 
-
-#if !UCONFIG_NO_COLLATION && !UCONFIG_NO_NORMALIZATION
+#if !UCONFIG_NO_COLLATION
 
 /**
  * \file
@@ -186,22 +188,19 @@ class UVector;
  */
 class U_I18N_API AlphabeticIndex: public UObject {
 public:
-#ifdef U_HIDE_DRAFT_API
-    class Bucket;
-#else
      /**
       * An index "bucket" with a label string and type.
       * It is referenced by getBucketIndex(),
       * and returned by ImmutableIndex.getBucket().
       *
       * The Bucket class is not intended for public subclassing.
-      * @draft ICU 51
+      * @stable ICU 51
       */
      class U_I18N_API Bucket : public UObject {
      public:
         /**
          * Destructor.
-         * @draft ICU 51
+         * @stable ICU 51
          */
         virtual ~Bucket();
 
@@ -209,14 +208,14 @@ public:
          * Returns the label string.
          *
          * @return the label string for the bucket
-         * @draft ICU 51
+         * @stable ICU 51
          */
         const UnicodeString &getLabel() const { return label_; }
         /**
          * Returns whether this bucket is a normal, underflow, overflow, or inflow bucket.
          *
          * @return the bucket label type
-         * @draft ICU 51
+         * @stable ICU 51
          */
         UAlphabeticIndexLabelType getLabelType() const { return labelType_; }
 
@@ -244,13 +243,13 @@ public:
      *
      * The ImmutableIndex class is not intended for public subclassing.
      *
-     * @draft ICU 51
+     * @stable ICU 51
      */
     class U_I18N_API ImmutableIndex : public UObject {
     public:
         /**
          * Destructor.
-         * @draft ICU 51
+         * @stable ICU 51
          */
         virtual ~ImmutableIndex();
 
@@ -258,7 +257,7 @@ public:
          * Returns the number of index buckets and labels, including underflow/inflow/overflow.
          *
          * @return the number of index buckets
-         * @draft ICU 51
+         * @stable ICU 51
          */
         int32_t getBucketCount() const;
 
@@ -267,8 +266,10 @@ public:
          * Use getBucket() to get the bucket's properties.
          *
          * @param name the string to be sorted into an index bucket
+         * @param errorCode Error code, will be set with the reason if the
+         *                  operation fails.
          * @return the bucket number for the name
-         * @draft ICU 51
+         * @stable ICU 51
          */
         int32_t getBucketIndex(const UnicodeString &name, UErrorCode &errorCode) const;
 
@@ -277,7 +278,7 @@ public:
          *
          * @param index bucket number
          * @return the index-th bucket
-         * @draft ICU 51
+         * @stable ICU 51
          */
         const Bucket *getBucket(int32_t index) const;
 
@@ -290,7 +291,6 @@ public:
         BucketList *buckets_;
         Collator *collatorPrimaryOnly_;
     };
-#endif  /* U_HIDE_DRAFT_API */
 
     /**
      * Construct an AlphabeticIndex object for the specified locale.  If the locale's
@@ -306,7 +306,6 @@ public:
      */
      AlphabeticIndex(const Locale &locale, UErrorCode &status);
 
-#ifndef U_HIDE_DRAFT_API
    /** 
      * Construct an AlphabeticIndex that uses a specific collator.
      * 
@@ -319,10 +318,9 @@ public:
      * @param collator The collator to use to order the contents of this index.
      * @param status Error code, will be set with the reason if the 
      *               operation fails.
-     * @draft ICU 51
+     * @stable ICU 51
      */
     AlphabeticIndex(RuleBasedCollator *collator, UErrorCode &status);
-#endif  /* U_HIDE_DRAFT_API */
 
     /**
      * Add Labels to this Index.  The labels are additions to those
@@ -357,15 +355,13 @@ public:
       */
     virtual ~AlphabeticIndex();
 
-#ifndef U_HIDE_DRAFT_API
     /**
      * Builds an immutable, thread-safe version of this instance, without data records.
      *
      * @return an immutable index instance
-     * @draft ICU 51
+     * @stable ICU 51
      */
     ImmutableIndex *buildImmutableIndex(UErrorCode &errorCode);
-#endif  /* U_HIDE_DRAFT_API */
 
     /**
      * Get the Collator that establishes the ordering of the items in this index.
@@ -383,9 +379,10 @@ public:
 
 
    /**
-     * Get the default label used for abbreviated buckets <i>between</i> other index characters.
-     * For example, consider the labels when Latin and Greek are used:
-     *     X Y Z ... &#x0391; &#x0392; &#x0393;.
+     * Get the default label used for abbreviated buckets *between* other index characters.
+     * For example, consider the labels when Latin (X Y Z) and Greek (Α Β Γ) are used:
+     *
+     *     X Y Z ... Α Β Γ.
      *
      * @return inflow label
      * @stable ICU 4.8
@@ -675,7 +672,7 @@ private:
      * This method is called to get the index exemplars. Normally these come from the locale directly,
      * but if they aren't available, we have to synthesize them.
      */
-    void addIndexExemplars(const Locale *locale, UErrorCode &status);
+    void addIndexExemplars(const Locale &locale, UErrorCode &status);
     /**
      * Add Chinese index characters from the tailoring.
      */
@@ -706,6 +703,7 @@ public:
     /**
      * A (name, data) pair, to be sorted by name into one of the index buckets.
      * The user data is not used by the index implementation.
+     * \cond
      * @internal
      */
     struct Record: public UMemory {
@@ -714,6 +712,7 @@ public:
         Record(const UnicodeString &name, const void *data);
         ~Record();
     };
+    /** \endcond */
 #endif  /* U_HIDE_INTERNAL_API */
 
 private:
@@ -757,5 +756,5 @@ private:
 
 U_NAMESPACE_END
 
-#endif /* UCONFIG_NO_COLLATION / UCONFIG_NO_NORMALIZATION */
+#endif  // !UCONFIG_NO_COLLATION
 #endif

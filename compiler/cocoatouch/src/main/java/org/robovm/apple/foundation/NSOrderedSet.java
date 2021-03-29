@@ -221,6 +221,12 @@ import org.robovm.apple.dispatch.*;
     public void clear() {
         listAdapter.clear();
     }
+
+    @Override
+    public Spliterator<T> spliterator() {
+        return Spliterators.spliterator(this, Spliterator.DISTINCT | Spliterator.SORTED | Spliterator.ORDERED);
+    }
+
     public boolean contains(Object o) {
         return setAdapter.contains(o);
     }

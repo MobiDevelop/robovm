@@ -16,6 +16,7 @@
 
 package org.apache.harmony.xml;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import org.xml.sax.Attributes;
 
 /**
@@ -27,6 +28,10 @@ abstract class ExpatAttributes implements Attributes {
      * Since we don't do validation, pretty much everything is CDATA type.
      */
     private static final String CDATA = "CDATA";
+
+    @UnsupportedAppUsage
+    public ExpatAttributes() {
+    }
 
     /**
      * Gets the number of attributes.

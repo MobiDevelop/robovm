@@ -15,10 +15,11 @@
  * limitations under the License.
  */
 
-#include "JniConstants.h"
-#include "JniException.h"
-#include "UniquePtr.h"
 #include "ZipUtilities.h"
+
+#include <nativehelper/JNIHelp.h>
+
+#include "JniException.h"
 
 void throwExceptionForZlibError(JNIEnv* env, const char* exceptionClassName, int error,
     NativeZipStream* stream) {
@@ -31,7 +32,7 @@ void throwExceptionForZlibError(JNIEnv* env, const char* exceptionClassName, int
   }
 }
 
-NativeZipStream::NativeZipStream() : input(NULL), inCap(0), mDict(NULL) {
+NativeZipStream::NativeZipStream() : inCap(0), totalIn(0), totalOut(0) {
   // Let zlib use its default allocator.
   stream.opaque = Z_NULL;
   stream.zalloc = Z_NULL;
@@ -43,7 +44,7 @@ NativeZipStream::~NativeZipStream() {
 
 void NativeZipStream::setDictionary(JNIEnv* env, jbyteArray javaDictionary, int off, int len,
     bool inflate) {
-  UniquePtr<jbyte[]> dictionaryBytes(new jbyte[len]);
+  std::unique_ptr<jbyte[]> dictionaryBytes(new jbyte[len]);
   if (dictionaryBytes.get() == NULL) {
     jniThrowOutOfMemoryError(env, NULL);
     return;

@@ -692,7 +692,7 @@ jboolean rvmInitClasses(Env* env) {
 }
 
 jboolean rvmInitPrimitiveWrapperClasses(Env* env) {
-    Class* c = NULL;
+    Class* cache = NULL;
     ClassField* f = NULL;
 
     f = rvmGetClassField(env, java_lang_Boolean, "TRUE", "Ljava/lang/Boolean;");
@@ -707,37 +707,47 @@ jboolean rvmInitPrimitiveWrapperClasses(Env* env) {
 
     java_lang_Byte_valueOf = rvmGetClassMethod(env, java_lang_Byte, "valueOf", "(B)Ljava/lang/Byte;");
     if (!java_lang_Byte_valueOf) return FALSE;
-    f = rvmGetClassField(env, java_lang_Byte, "VALUES", "[Ljava/lang/Byte;");
+    cache = findBootClass(env, "java/lang/Byte$ByteCache");
+    if (!cache) return FALSE;
+    f = rvmGetClassField(env, cache, "cache", "[Ljava/lang/Byte;");
     if (!f) return FALSE;
-    bytesCache = (ObjectArray*) rvmGetObjectClassFieldValue(env, java_lang_Byte, f);
+    bytesCache = (ObjectArray*) rvmGetObjectClassFieldValue(env, cache, f);
     if (!bytesCache) return FALSE;
 
     java_lang_Short_valueOf = rvmGetClassMethod(env, java_lang_Short, "valueOf", "(S)Ljava/lang/Short;");
     if (!java_lang_Short_valueOf) return FALSE;
-    f = rvmGetClassField(env, java_lang_Short, "SMALL_VALUES", "[Ljava/lang/Short;");
+    cache = findBootClass(env, "java/lang/Short$ShortCache");
+    if (!cache) return FALSE;
+    f = rvmGetClassField(env, cache, "cache", "[Ljava/lang/Short;");
     if (!f) return FALSE;
-    shortsCache = (ObjectArray*) rvmGetObjectClassFieldValue(env, c, f);
+    shortsCache = (ObjectArray*) rvmGetObjectClassFieldValue(env, cache, f);
     if (!shortsCache) return FALSE;
 
     java_lang_Character_valueOf = rvmGetClassMethod(env, java_lang_Character, "valueOf", "(C)Ljava/lang/Character;");
     if (!java_lang_Character_valueOf) return FALSE;
-    f = rvmGetClassField(env, java_lang_Character, "SMALL_VALUES", "[Ljava/lang/Character;");
+    cache = findBootClass(env, "java/lang/Character$CharacterCache");
+    if (!cache) return FALSE;
+    f = rvmGetClassField(env, cache, "cache", "[Ljava/lang/Character;");
     if (!f) return FALSE;
-    charactersCache = (ObjectArray*) rvmGetObjectClassFieldValue(env, c, f);
+    charactersCache = (ObjectArray*) rvmGetObjectClassFieldValue(env, cache, f);
     if (!charactersCache) return FALSE;
 
     java_lang_Integer_valueOf = rvmGetClassMethod(env, java_lang_Integer, "valueOf", "(I)Ljava/lang/Integer;");
     if (!java_lang_Integer_valueOf) return FALSE;
-    f = rvmGetClassField(env, java_lang_Integer, "SMALL_VALUES", "[Ljava/lang/Integer;");
+    cache = findBootClass(env, "java/lang/Integer$IntegerCache");
+    if (!cache) return FALSE;
+    f = rvmGetClassField(env, cache, "cache", "[Ljava/lang/Integer;");
     if (!f) return FALSE;
-    integersCache = (ObjectArray*) rvmGetObjectClassFieldValue(env, c, f);
+    integersCache = (ObjectArray*) rvmGetObjectClassFieldValue(env, cache, f);
     if (!integersCache) return FALSE;
 
     java_lang_Long_valueOf = rvmGetClassMethod(env, java_lang_Long, "valueOf", "(J)Ljava/lang/Long;");
     if (!java_lang_Long_valueOf) return FALSE;
-    f = rvmGetClassField(env, java_lang_Long, "SMALL_VALUES", "[Ljava/lang/Long;");
+    cache = findBootClass(env, "java/lang/Long$LongCache");
+    if (!cache) return FALSE;
+    f = rvmGetClassField(env, cache, "cache", "[Ljava/lang/Long;");
     if (!f) return FALSE;
-    longsCache = (ObjectArray*) rvmGetObjectClassFieldValue(env, c, f);
+    longsCache = (ObjectArray*) rvmGetObjectClassFieldValue(env, cache, f);
     if (!longsCache) return FALSE;
 
     java_lang_Float_valueOf = rvmGetClassMethod(env, java_lang_Float, "valueOf", "(F)Ljava/lang/Float;");

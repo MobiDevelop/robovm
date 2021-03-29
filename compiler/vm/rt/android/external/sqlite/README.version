@@ -1,0 +1,4 @@
+URL: https://www.sqlite.org/src/info/68b898381ac29429
+Version: 3.22.0 68b898381ac2942965a3dbd416a45ddf813d6df7ea160f500ae4978e44a3a050
+This patch fixes CVE-2019-9936，CVE-2019-5018，CVE-2019-8457 in b/140181188 b/140180629 and b/140182003 respectively
+BugComponent: 24950

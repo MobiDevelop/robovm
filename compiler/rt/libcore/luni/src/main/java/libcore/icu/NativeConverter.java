@@ -9,12 +9,17 @@
 
 package libcore.icu;
 
+import libcore.util.NativeAllocationRegistry;
+
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 
 public final class NativeConverter {
+    private static final NativeAllocationRegistry registry = new NativeAllocationRegistry(
+            NativeConverter.class.getClassLoader(), getNativeFinalizer(), getNativeSize());
+
     public static native int decode(long converterHandle, byte[] input, int inEnd,
             char[] output, int outEnd, int[] data, boolean flush);
 
@@ -23,6 +28,10 @@ public final class NativeConverter {
 
     public static native long openConverter(String charsetName);
     public static native void closeConverter(long converterHandle);
+
+    public static void registerConverter(Object referrent, long converterHandle) {
+        registry.registerNativeAllocation(referrent, converterHandle);
+    }
 
     public static native void resetByteToChar(long converterHandle);
     public static native void resetCharToByte(long converterHandle);
@@ -67,4 +76,7 @@ public final class NativeConverter {
                           encoder.replacement());
     }
     private static native void setCallbackEncode(long converterHandle, int onMalformedInput, int onUnmappableInput, byte[] subBytes);
+
+    public static native long getNativeFinalizer();
+    public static native long getNativeSize();
 }

@@ -26,8 +26,8 @@ jlong Java_java_lang_Throwable_nativeFillInStackTrace(Env* env, Object* thiz) {
     return PTR_TO_LONG(rvmCaptureCallStack(env));
 }
 
-ObjectArray* Java_java_lang_Throwable_nativeGetStackTrace(Env* env, Object* thiz, jlong stackState) {
-    CallStack* callStack = (CallStack*) LONG_TO_PTR(stackState);
+ObjectArray* Java_java_lang_Throwable_nativeGetStackTrace(Env* env, Object* thiz, jlong backtrace) {
+    CallStack* callStack = (CallStack*) LONG_TO_PTR(backtrace);
     if (!callStack) {
         return rvmCallStackToStackTraceElements(env, NULL, 0);
     }

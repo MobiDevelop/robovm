@@ -22,7 +22,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * A "system annotation" used to provide the AnnotationDefault attribute.
+ * A system annotation used to provide the {@code AnnotationDefault} attribute.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.ANNOTATION_TYPE)

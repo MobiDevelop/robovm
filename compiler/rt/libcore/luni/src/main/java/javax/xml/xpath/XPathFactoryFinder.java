@@ -56,14 +56,29 @@ final class XPathFactoryFinder {
     }
 
     /**
-     * <p>Cache properties for performance.</p>
+     * <p>Cache properties for performance. Use a static class to avoid double-checked
+     * locking.</p>
      */
-    private static Properties cacheProps = new Properties();
+    private static class CacheHolder {
 
-    /**
-     * <p>First time requires initialization overhead.</p>
-     */
-    private static boolean firstTime = true;
+        private static Properties cacheProps = new Properties();
+
+        static {
+            String javah = System.getProperty("java.home");
+            String configFile = javah + File.separator + "lib" + File.separator + "jaxp.properties";
+            File f = new File(configFile);
+            if (f.exists()) {
+                if (debug) debugPrintln("Read properties file " + f);
+                try (FileInputStream inputStream = new FileInputStream(f)) {
+                    cacheProps.load(inputStream);
+                } catch (Exception ex) {
+                    if (debug) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * <p>Conditional debug printing.</p>
@@ -164,27 +179,9 @@ final class XPathFactoryFinder {
             e.printStackTrace();
         }
 
-        String javah = System.getProperty("java.home");
-        String configFile = javah + File.separator +
-        "lib" + File.separator + "jaxp.properties";
-
-        String factoryClassName = null ;
-
         // try to read from $java.home/lib/jaxp.properties
         try {
-            if(firstTime){
-                synchronized(cacheProps){
-                    if(firstTime){
-                        File f=new File( configFile );
-                        firstTime = false;
-                        if (f.exists()) {
-                            if (debug) debugPrintln("Read properties file " + f);
-                            cacheProps.load(new FileInputStream(f));
-                        }
-                    }
-                }
-            }
-            factoryClassName = cacheProps.getProperty(propertyName);
+            String factoryClassName = CacheHolder.cacheProps.getProperty(propertyName);
             if (debug) debugPrintln("found " + factoryClassName + " in $java.home/jaxp.properties");
 
             if (factoryClassName != null) {

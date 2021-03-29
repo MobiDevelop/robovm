@@ -12,6 +12,7 @@
 
 package org.w3c.dom.traversal;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import org.w3c.dom.Node;
 
 /**
@@ -141,6 +142,7 @@ public interface NodeFilter {
      * @return A constant to determine whether the node is accepted,
      *   rejected, or skipped, as defined above.
      */
+    @UnsupportedAppUsage
     public short acceptNode(Node n);
 
 }

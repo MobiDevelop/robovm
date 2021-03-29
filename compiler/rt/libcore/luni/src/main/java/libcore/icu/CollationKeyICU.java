@@ -1,12 +1,12 @@
 /**
-*******************************************************************************
-* Copyright (C) 1996-2005, International Business Machines Corporation and    *
-* others. All Rights Reserved.                                                *
-*******************************************************************************
-*
-*
-*******************************************************************************
-*/
+ * ******************************************************************************
+ * Copyright (C) 1996-2005, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ * ******************************************************************************
+ *
+ *
+ * ******************************************************************************
+ */
 
 package libcore.icu;
 
@@ -19,59 +19,28 @@ public final class CollationKeyICU extends CollationKey {
     /**
      * The key.
      */
-    private final byte[] bytes;
+    private final android.icu.text.CollationKey key;
 
-    /**
-     * Cached hash value.
-     */
-    private int hashCode;
-
-    CollationKeyICU(String source, byte[] bytes) {
+    public CollationKeyICU(String source, android.icu.text.CollationKey key) {
         super(source);
-        this.bytes = bytes;
+        this.key = key;
     }
 
-    @Override public int compareTo(CollationKey other) {
-        // Get the bytes from the other collation key.
-        final byte[] rhsBytes;
+    @Override
+    public int compareTo(CollationKey other) {
+        final android.icu.text.CollationKey otherKey;
         if (other instanceof CollationKeyICU) {
-            rhsBytes = ((CollationKeyICU) other).bytes;
+            otherKey = ((CollationKeyICU) other).key;
         } else {
-            rhsBytes = other.toByteArray();
+            otherKey = new android.icu.text.CollationKey(other.getSourceString(),
+                    other.toByteArray());
         }
 
-        if (bytes == null || bytes.length == 0) {
-            if (rhsBytes == null || rhsBytes.length == 0) {
-                return 0;
-            }
-            return -1;
-        } else {
-            if (rhsBytes == null || rhsBytes.length == 0) {
-                return 1;
-            }
-        }
-
-        int count = Math.min(bytes.length, rhsBytes.length);
-        for (int i = 0; i < count; ++i) {
-            int s = bytes[i] & 0xff;
-            int t = rhsBytes[i] & 0xff;
-            if (s < t) {
-                return -1;
-            }
-            if (s > t) {
-                return 1;
-            }
-        }
-        if (bytes.length < rhsBytes.length) {
-            return -1;
-        }
-        if (bytes.length > rhsBytes.length) {
-            return 1;
-        }
-        return 0;
+        return key.compareTo(otherKey);
     }
 
-    @Override public boolean equals(Object object) {
+    @Override
+    public boolean equals(Object object) {
         if (object == this) {
             return true;
         }
@@ -88,30 +57,17 @@ public final class CollationKeyICU extends CollationKey {
      * hash value by a prime number and add the new byte in, like a linear
      * congruential random number generator, producing a pseudo-random
      * deterministic value well distributed over the output range.
+     *
      * @return hash value of collation key. Hash value is never 0.
      * @stable ICU 2.4
      */
-    @Override public int hashCode() {
-        if (hashCode == 0) {
-            if (bytes != null && bytes.length != 0) {
-                int len = bytes.length;
-                int inc = ((len - 32) / 32) + 1;
-                for (int i = 0; i < len;) {
-                    hashCode = (hashCode * 37) + bytes[i];
-                    i += inc;
-                }
-            }
-            if (hashCode == 0) {
-                hashCode = 1;
-            }
-        }
-        return hashCode;
+    @Override
+    public int hashCode() {
+        return key.hashCode();
     }
 
-    @Override public byte[] toByteArray() {
-        if (bytes == null || bytes.length == 0) {
-            return null;
-        }
-        return bytes.clone();
+    @Override
+    public byte[] toByteArray() {
+        return key.toByteArray();
     }
 }

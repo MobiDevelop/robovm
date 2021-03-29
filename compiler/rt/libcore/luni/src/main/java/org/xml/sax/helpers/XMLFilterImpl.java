@@ -6,6 +6,7 @@
 
 package org.xml.sax.helpers;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import java.io.IOException;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
@@ -683,6 +684,7 @@ public class XMLFilterImpl
      * non-null, and re-register the filter for all of the
      * events.</p>
      */
+    @UnsupportedAppUsage
     private void setupParse ()
     {
     if (parent == null) {
@@ -700,11 +702,17 @@ public class XMLFilterImpl
     // Internal state.
     ////////////////////////////////////////////////////////////////////
 
+    @UnsupportedAppUsage
     private XMLReader parent = null;
+    @UnsupportedAppUsage
     private Locator locator = null;
+    @UnsupportedAppUsage
     private EntityResolver entityResolver = null;
+    @UnsupportedAppUsage
     private DTDHandler dtdHandler = null;
+    @UnsupportedAppUsage
     private ContentHandler contentHandler = null;
+    @UnsupportedAppUsage
     private ErrorHandler errorHandler = null;
 
 }

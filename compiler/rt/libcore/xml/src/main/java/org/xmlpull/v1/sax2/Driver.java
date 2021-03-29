@@ -36,7 +36,7 @@ import org.xmlpull.v1.XmlPullParserFactory;
 
 /**
  * SAX2 Driver that pulls events from XmlPullParser
- * and comverts them into SAX2 callbacks.
+ * and converts them into SAX2 callbacks.
  *
  * @author <a href="http://www.extreme.indiana.edu/~aslom/">Aleksander Slominski</a>
  */

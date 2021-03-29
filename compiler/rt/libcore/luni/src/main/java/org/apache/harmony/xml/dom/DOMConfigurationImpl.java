@@ -357,6 +357,10 @@ public final class DOMConfigurationImpl implements DOMConfiguration {
     }
 
     public DOMStringList getParameterNames() {
+        return internalGetParameterNames();
+    }
+
+    private static DOMStringList internalGetParameterNames() {
         final String[] result = PARAMETERS.keySet().toArray(new String[PARAMETERS.size()]);
         return new DOMStringList() {
             public String item(int index) {

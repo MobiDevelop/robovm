@@ -1,0 +1,97 @@
+// Copyright (C) 2008 The Android Open Source Project
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//
+// Common definitions.
+//
+
+cc_defaults {
+    name: "libicuuc_defaults",
+    srcs: [
+        "*.cpp",
+    ],
+
+    // We deliberately do not set -DICU_DATA_DIR: ICU4C is configured on Android
+    // using udata_setCommonData.
+    cflags: [
+        "-D_REENTRANT",
+        "-DU_COMMON_IMPLEMENTATION",
+
+        "-O3",
+        "-fvisibility=hidden",
+
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-parameter",
+        "-Wno-missing-field-initializers",
+        "-Wno-sign-compare",
+        "-Wno-deprecated-declarations",
+    ],
+
+    cppflags: [
+        "-std=c++11",
+    ],
+
+    rtti: true,
+
+    required: ["icu-data_host_runtime_apex"],
+
+    target: {
+        android: {
+            cflags: [
+                "-DANDROID_LINK_SHARED_ICU4C",
+                "-DPIC",
+                "-fPIC",
+            ],
+        },
+    },
+}
+
+cc_library_headers {
+    name: "libicuuc_headers",
+    host_supported: true,
+    header_libs: [ "icu4c_extra_headers" ],
+    export_header_lib_headers: [ "icu4c_extra_headers" ],
+    export_include_dirs: ["."],
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
+}
+
+//
+// Build for the host and target.
+//
+cc_library_shared {
+    name: "libicuuc",
+    host_supported: true,
+    unique_host_soname: true,
+    defaults: ["libicuuc_defaults"],
+    target: {
+        android: {
+            static_libs: ["libicuuc_stubdata"],
+        },
+        not_windows: {
+            static_libs: ["libicuuc_stubdata"],
+        },
+        windows: {
+            enabled: true,
+            // Windows requires importing data as a DLL when building with U_COMMON_IMPLEMENTATION
+            shared_libs: ["libicuuc_stubdata"],
+        },
+    },
+    header_libs: [ "libicuuc_headers" ],
+    export_header_lib_headers: [ "libicuuc_headers" ],
+}

@@ -5,6 +5,7 @@
 
 package org.xml.sax.ext;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import org.xml.sax.Locator;
 import org.xml.sax.helpers.LocatorImpl;
 
@@ -26,7 +27,9 @@ import org.xml.sax.helpers.LocatorImpl;
  */
 public class Locator2Impl extends LocatorImpl implements Locator2
 {
+    @UnsupportedAppUsage
     private String    encoding;
+    @UnsupportedAppUsage
     private String    version;
 
 

@@ -1,6 +1,8 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
 ********************************************************************************
-*   Copyright (C) 1997-2013, International Business Machines
+*   Copyright (C) 1997-2014, International Business Machines
 *   Corporation and others.  All Rights Reserved.
 ********************************************************************************
 *
@@ -28,7 +30,7 @@
 #include "unicode/utypes.h"
 
 /**
- * \file 
+ * \file
  * \brief C++ API: Calendar object
  */
 #if !UCONFIG_NO_FORMATTING
@@ -50,150 +52,133 @@ typedef int32_t UFieldResolutionTable[12][8];
 
 class BasicTimeZone;
 /**
- * <code>Calendar</code> is an abstract base class for converting between
- * a <code>UDate</code> object and a set of integer fields such as
- * <code>YEAR</code>, <code>MONTH</code>, <code>DAY</code>, <code>HOUR</code>,
- * and so on. (A <code>UDate</code> object represents a specific instant in
+ * `Calendar` is an abstract base class for converting between
+ * a `UDate` object and a set of integer fields such as
+ * `YEAR`, `MONTH`, `DAY`, `HOUR`, and so on.
+ * (A `UDate` object represents a specific instant in
  * time with millisecond precision. See UDate
- * for information about the <code>UDate</code> class.)
+ * for information about the `UDate` class.)
  *
- * <p>
- * Subclasses of <code>Calendar</code> interpret a <code>UDate</code>
+ * Subclasses of `Calendar` interpret a `UDate`
  * according to the rules of a specific calendar system.
- * The most commonly used subclass of <code>Calendar</code> is
- * <code>GregorianCalendar</code>. Other subclasses could represent
+ * The most commonly used subclass of `Calendar` is
+ * `GregorianCalendar`. Other subclasses could represent
  * the various types of lunar calendars in use in many parts of the world.
  *
- * <p>
- * <b>NOTE</b>: (ICU 2.6) The subclass interface should be considered unstable
- * - it WILL change.
+ * **NOTE**: (ICU 2.6) The subclass interface should be considered unstable -
+ * it WILL change.
  *
- * <p>
- * Like other locale-sensitive classes, <code>Calendar</code> provides a
- * static method, <code>createInstance</code>, for getting a generally useful
- * object of this type. <code>Calendar</code>'s <code>createInstance</code> method
- * returns the appropriate <code>Calendar</code> subclass whose
+ * Like other locale-sensitive classes, `Calendar` provides a
+ * static method, `createInstance`, for getting a generally useful
+ * object of this type. `Calendar`'s `createInstance` method
+ * returns the appropriate `Calendar` subclass whose
  * time fields have been initialized with the current date and time:
- * \htmlonly<blockquote>\endhtmlonly
- * <pre>
- * Calendar *rightNow = Calendar::createInstance(errCode);
- * </pre>
- * \htmlonly</blockquote>\endhtmlonly
  *
- * <p>
- * A <code>Calendar</code> object can produce all the time field values
+ *     Calendar *rightNow = Calendar::createInstance(errCode);
+ *
+ * A `Calendar` object can produce all the time field values
  * needed to implement the date-time formatting for a particular language
  * and calendar style (for example, Japanese-Gregorian, Japanese-Traditional).
  *
- * <p>
- * When computing a <code>UDate</code> from time fields, some special circumstances
+ * When computing a `UDate` from time fields, some special circumstances
  * may arise: there may be insufficient information to compute the
- * <code>UDate</code> (such as only year and month but no day in the month),
+ * `UDate` (such as only year and month but no day in the month),
  * there may be inconsistent information (such as "Tuesday, July 15, 1996"
  * -- July 15, 1996 is actually a Monday), or the input time might be ambiguous
  * because of time zone transition.
  *
- * <p>
- * <strong>Insufficient information.</strong> The calendar will use default
+ * **Insufficient information.** The calendar will use default
  * information to specify the missing fields. This may vary by calendar; for
  * the Gregorian calendar, the default for a field is the same as that of the
  * start of the epoch: i.e., YEAR = 1970, MONTH = JANUARY, DATE = 1, etc.
  *
- * <p>
- * <strong>Inconsistent information.</strong> If fields conflict, the calendar
+ * **Inconsistent information.** If fields conflict, the calendar
  * will give preference to fields set more recently. For example, when
  * determining the day, the calendar will look for one of the following
  * combinations of fields.  The most recent combination, as determined by the
  * most recently set single field, will be used.
  *
- * \htmlonly<blockquote>\endhtmlonly
- * <pre>
- * MONTH + DAY_OF_MONTH
- * MONTH + WEEK_OF_MONTH + DAY_OF_WEEK
- * MONTH + DAY_OF_WEEK_IN_MONTH + DAY_OF_WEEK
- * DAY_OF_YEAR
- * DAY_OF_WEEK + WEEK_OF_YEAR
- * </pre>
- * \htmlonly</blockquote>\endhtmlonly
+ *     MONTH + DAY_OF_MONTH
+ *     MONTH + WEEK_OF_MONTH + DAY_OF_WEEK
+ *     MONTH + DAY_OF_WEEK_IN_MONTH + DAY_OF_WEEK
+ *     DAY_OF_YEAR
+ *     DAY_OF_WEEK + WEEK_OF_YEAR
  *
  * For the time of day:
  *
- * \htmlonly<blockquote>\endhtmlonly
- * <pre>
- * HOUR_OF_DAY
- * AM_PM + HOUR
- * </pre>
- * \htmlonly</blockquote>\endhtmlonly
+ *     HOUR_OF_DAY
+ *     AM_PM + HOUR
  *
- * <p>
- * <strong>Ambiguous Wall Clock Time.</strong> When time offset from UTC has
- * changed, it produces ambiguous time slot around the transition. For example,
+ * **Ambiguous Wall Clock Time.** When time offset from UTC has
+ * changed, it produces an ambiguous time slot around the transition. For example,
  * many US locations observe daylight saving time. On the date switching to daylight
- * saving time in US, wall clock time jumps from 1:00 AM (standard) to 2:00 AM
+ * saving time in US, wall clock time jumps from 12:59 AM (standard) to 2:00 AM
  * (daylight). Therefore, wall clock time from 1:00 AM to 1:59 AM do not exist on
  * the date. When the input wall time fall into this missing time slot, the ICU
  * Calendar resolves the time using the UTC offset before the transition by default.
  * In this example, 1:30 AM is interpreted as 1:30 AM standard time (non-exist),
  * so the final result will be 2:30 AM daylight time.
- * 
- * <p>On the date switching back to standard time, wall clock time is moved back one
+ *
+ * On the date switching back to standard time, wall clock time is moved back one
  * hour at 2:00 AM. So wall clock time from 1:00 AM to 1:59 AM occur twice. In this
  * case, the ICU Calendar resolves the time using the UTC offset after the transition
  * by default. For example, 1:30 AM on the date is resolved as 1:30 AM standard time.
  *
- * <p>Ambiguous wall clock time resolution behaviors can be customized by Calendar APIs
+ * Ambiguous wall clock time resolution behaviors can be customized by Calendar APIs
  * {@link #setRepeatedWallTimeOption} and {@link #setSkippedWallTimeOption}.
  * These methods are available in ICU 49 or later versions.
  *
- * <p>
- * <strong>Note:</strong> for some non-Gregorian calendars, different
+ * **Note:** for some non-Gregorian calendars, different
  * fields may be necessary for complete disambiguation. For example, a full
- * specification of the historial Arabic astronomical calendar requires year,
- * month, day-of-month <em>and</em> day-of-week in some cases.
+ * specification of the historical Arabic astronomical calendar requires year,
+ * month, day-of-month *and* day-of-week in some cases.
  *
- * <p>
- * <strong>Note:</strong> There are certain possible ambiguities in
+ * **Note:** There are certain possible ambiguities in
  * interpretation of certain singular times, which are resolved in the
  * following ways:
- * <ol>
- *     <li> 24:00:00 "belongs" to the following day. That is,
- *          23:59 on Dec 31, 1969 &lt; 24:00 on Jan 1, 1970 &lt; 24:01:00 on Jan 1, 1970
  *
- *     <li> Although historically not precise, midnight also belongs to "am",
- *          and noon belongs to "pm", so on the same day,
- *          12:00 am (midnight) &lt; 12:01 am, and 12:00 pm (noon) &lt; 12:01 pm
- * </ol>
+ *   1. 24:00:00 "belongs" to the following day. That is,
+ *      23:59 on Dec 31, 1969 < 24:00 on Jan 1, 1970 < 24:01:00 on Jan 1, 1970
+ *   2. Although historically not precise, midnight also belongs to "am",
+ *      and noon belongs to "pm", so on the same day,
+ *      12:00 am (midnight) < 12:01 am, and 12:00 pm (noon) < 12:01 pm
  *
- * <p>
  * The date or time format strings are not part of the definition of a
  * calendar, as those must be modifiable or overridable by the user at
- * runtime. Use {@link DateFormat}
- * to format dates.
+ * runtime. Use `DateFormat` to format dates.
  *
- * <p>
- * <code>Calendar</code> provides an API for field "rolling", where fields
+ * `Calendar` provides an API for field "rolling", where fields
  * can be incremented or decremented, but wrap around. For example, rolling the
- * month up in the date <code>December 12, <b>1996</b></code> results in
- * <code>January 12, <b>1996</b></code>.
+ * month up in the date December 12, **1996** results in
+ * January 12, **1996**.
+ *
+ * `Calendar` also provides a date arithmetic function for
+ * adding the specified (signed) amount of time to a particular time field.
+ * For example, subtracting 5 days from the date `September 12, 1996`
+ * results in `September 7, 1996`.
+ *
+ * ***Supported range***
+ *
+ * The allowable range of `Calendar` has been narrowed. `GregorianCalendar` used
+ * to attempt to support the range of dates with millisecond values from
+ * `Long.MIN_VALUE` to `Long.MAX_VALUE`. The new `Calendar` protocol specifies the
+ * maximum range of supportable dates as those having Julian day numbers
+ * of `-0x7F000000` to `+0x7F000000`. This corresponds to years from ~5,800,000 BCE
+ * to ~5,800,000 CE. Programmers should use the protected constants in `Calendar` to
+ * specify an extremely early or extremely late date.
  *
  * <p>
- * <code>Calendar</code> also provides a date arithmetic function for
- * adding the specified (signed) amount of time to a particular time field.
- * For example, subtracting 5 days from the date <code>September 12, 1996</code>
- * results in <code>September 7, 1996</code>.
- *
- * <p><big><b>Supported range</b></big>
- *
- * <p>The allowable range of <code>Calendar</code> has been
- * narrowed. <code>GregorianCalendar</code> used to attempt to support
- * the range of dates with millisecond values from
- * <code>Long.MIN_VALUE</code> to <code>Long.MAX_VALUE</code>.
- * The new <code>Calendar</code> protocol specifies the
- * maximum range of supportable dates as those having Julian day numbers
- * of <code>-0x7F000000</code> to <code>+0x7F000000</code>. This
- * corresponds to years from ~5,800,000 BCE to ~5,800,000 CE. Programmers
- * should use the protected constants in <code>Calendar</code> to
- * specify an extremely early or extremely late date.</p>
+ * The Japanese calendar uses a combination of era name and year number.
+ * When an emperor of Japan abdicates and a new emperor ascends the throne,
+ * a new era is declared and year number is reset to 1. Even if the date of
+ * abdication is scheduled ahead of time, the new era name might not be
+ * announced until just before the date. In such case, ICU4C may include
+ * a start date of future era without actual era name, but not enabled
+ * by default. ICU4C users who want to test the behavior of the future era
+ * can enable the tentative era by:
+ * <ul>
+ * <li>Environment variable <code>ICU_ENABLE_TENTATIVE_ERA=true</code>.</li>
+ * </ul>
  *
  * @stable ICU 2.0
  */
@@ -233,7 +218,7 @@ public:
         DST_OFFSET,           // Example: 0 or U_MILLIS_PER_HOUR
         YEAR_WOY,             // 'Y' Example: 1..big number - Year of Week of Year
         DOW_LOCAL,            // 'e' Example: 1..7 - Day of Week / Localized
-        
+
         EXTENDED_YEAR,
         JULIAN_DAY,
         MILLISECONDS_IN_DAY,
@@ -901,7 +886,7 @@ public:
     /**
      * Sets the behavior for handling wall time repeating multiple times
      * at negative time zone offset transitions. For example, 1:30 AM on
-     * November 6, 2011 in US Eastern time (Ameirca/New_York) occurs twice;
+     * November 6, 2011 in US Eastern time (America/New_York) occurs twice;
      * 1:30 AM EDT, then 1:30 AM EST one hour later. When <code>UCAL_WALLTIME_FIRST</code>
      * is used, the wall time 1:30AM in this example will be interpreted as 1:30 AM EDT
      * (first occurrence). When <code>UCAL_WALLTIME_LAST</code> is used, it will be
@@ -912,7 +897,7 @@ public:
      * option for this. When the argument is neither <code>UCAL_WALLTIME_FIRST</code>
      * nor <code>UCAL_WALLTIME_LAST</code>, this method has no effect and will keep
      * the current setting.
-     * 
+     *
      * @param option the behavior for handling repeating wall time, either
      * <code>UCAL_WALLTIME_FIRST</code> or <code>UCAL_WALLTIME_LAST</code>.
      * @see #getRepeatedWallTimeOption
@@ -923,7 +908,7 @@ public:
     /**
      * Gets the behavior for handling wall time repeating multiple times
      * at negative time zone offset transitions.
-     * 
+     *
      * @return the behavior for handling repeating wall time, either
      * <code>UCAL_WALLTIME_FIRST</code> or <code>UCAL_WALLTIME_LAST</code>.
      * @see #setRepeatedWallTimeOption
@@ -944,12 +929,12 @@ public:
      * <p>
      * <b>Note:</b>This option is effective only when this calendar is lenient.
      * When the calendar is strict, such non-existing wall time will cause an error.
-     * 
+     *
      * @param option the behavior for handling skipped wall time at positive time zone
      * offset transitions, one of <code>UCAL_WALLTIME_FIRST</code>, <code>UCAL_WALLTIME_LAST</code> and
      * <code>UCAL_WALLTIME_NEXT_VALID</code>.
      * @see #getSkippedWallTimeOption
-     * 
+     *
      * @stable ICU 49
      */
     void setSkippedWallTimeOption(UCalendarWallTimeOption option);
@@ -957,7 +942,7 @@ public:
     /**
      * Gets the behavior for handling skipped wall time at positive time zone offset
      * transitions.
-     * 
+     *
      * @return the behavior for handling skipped wall time, one of
      * <code>UCAL_WALLTIME_FIRST</code>, <code>UCAL_WALLTIME_LAST</code>
      * and <code>UCAL_WALLTIME_NEXT_VALID</code>.
@@ -1374,9 +1359,10 @@ public:
     virtual const char * getType() const = 0;
 
     /**
-     * Returns whether the given day of the week is a weekday, a
-     * weekend day, or a day that transitions from one to the other,
-     * in this calendar system. If a transition occurs at midnight,
+     * Returns whether the given day of the week is a weekday, a weekend day,
+     * or a day that transitions from one to the other, for the locale and
+     * calendar system associated with this Calendar (the locale's region is
+     * often the most determinant factor). If a transition occurs at midnight,
      * then the days before and after the transition will have the
      * type UCAL_WEEKDAY or UCAL_WEEKEND. If a transition occurs at a time
      * other than midnight, then the day of the transition will have
@@ -1392,7 +1378,7 @@ public:
 
     /**
      * Returns the time during the day at which the weekend begins or ends in
-     * this calendar system.  If getDayOfWeekType() rerturns UCAL_WEEKEND_ONSET
+     * this calendar system.  If getDayOfWeekType() returns UCAL_WEEKEND_ONSET
      * for the specified dayOfWeek, return the time at which the weekend begins.
      * If getDayOfWeekType() returns UCAL_WEEKEND_CEASE for the specified dayOfWeek,
      * return the time at which the weekend ends. If getDayOfWeekType() returns
@@ -1707,10 +1693,18 @@ protected:
      * (YEAR_WOY and WEEK_OF_YEAR) to an extended year in the case
      * where YEAR, EXTENDED_YEAR are not set.
      * The Calendar implementation assumes yearWoy is in extended gregorian form
-     * @internal
      * @return the extended year, UCAL_EXTENDED_YEAR
+     * @internal
      */
     virtual int32_t handleGetExtendedYearFromWeekFields(int32_t yearWoy, int32_t woy);
+
+    /**
+     * Validate a single field of this calendar.  Subclasses should
+     * override this method to validate any calendar-specific fields.
+     * Generic fields can be handled by `Calendar::validateField()`.
+     * @internal
+     */
+    virtual void validateField(UCalendarDateFields field, UErrorCode &status);
 
 #ifndef U_HIDE_INTERNAL_API
     /**
@@ -1728,7 +1722,7 @@ protected:
      * reflects local zone wall time.
      * @internal
      */
-    int32_t computeMillisInDay();
+    double computeMillisInDay();
 
     /**
      * This method can assume EXTENDED_YEAR has been set.
@@ -1739,7 +1733,7 @@ protected:
      *          when this function fails.
      * @internal
      */
-    int32_t computeZoneOffset(double millis, int32_t millisInDay, UErrorCode &ec);
+    int32_t computeZoneOffset(double millis, double millisInDay, UErrorCode &ec);
 
 
     /**
@@ -2153,12 +2147,12 @@ private:
 
     /**
      * Time zone affects the time calculation done by Calendar. Calendar subclasses use
-     * the time zone data to produce the local time.
+     * the time zone data to produce the local time. Always set; never NULL.
      */
     TimeZone*   fZone;
 
     /**
-     * Option for rpeated wall time
+     * Option for repeated wall time
      * @see #setRepeatedWallTimeOption
      */
     UCalendarWallTimeOption fRepeatedWallTime;
@@ -2292,16 +2286,6 @@ private:
     void validateFields(UErrorCode &status);
 
     /**
-     * Validate a single field of this calendar.  Subclasses should
-     * override this method to validate any calendar-specific fields.
-     * Generic fields can be handled by
-     * <code>Calendar::validateField()</code>.
-     * @see #validateField(int, int, int, int&)
-     * @internal
-     */
-    virtual void validateField(UCalendarDateFields field, UErrorCode &status);
-
-    /**
      * Validate a single field of this calendar given its minimum and
      * maximum allowed value.  If the field is out of range,
      * <code>U_ILLEGAL_ARGUMENT_ERROR</code> will be set.  Subclasses may
@@ -2347,6 +2331,11 @@ private:
     /**
      * Register a new Calendar factory.  The factory will be adopted.
      * INTERNAL in 2.6
+     *
+     * Because ICU may choose to cache Calendars internally, this must
+     * be called at application startup, prior to any calls to
+     * Calendar::createInstance to avoid undefined behavior.
+     *
      * @param toAdopt the factory instance to be adopted
      * @param status the in/out status code, no special meanings are assigned
      * @return a registry key that can be used to unregister this factory
@@ -2359,6 +2348,11 @@ private:
      * register call.  Key becomes invalid after a successful call and should not be used again.
      * The CalendarFactory corresponding to the key will be deleted.
      * INTERNAL in 2.6
+     *
+     * Because ICU may choose to cache Calendars internally, this should
+     * be called during application shutdown, after all calls to
+     * Calendar::createInstance to avoid undefined behavior.
+     *
      * @param key the registry key returned by a previous call to registerFactory
      * @param status the in/out status code, no special meanings are assigned
      * @return TRUE if the factory for the key was successfully unregistered
@@ -2387,19 +2381,19 @@ private:
 #endif /* !UCONFIG_NO_SERVICE */
 
     /**
-     * @internal
      * @return TRUE if this calendar has a default century (i.e. 03 -> 2003)
+     * @internal
      */
     virtual UBool haveDefaultCentury() const = 0;
 
     /**
-     * @internal
      * @return the start of the default century, as a UDate
+     * @internal
      */
     virtual UDate defaultCenturyStart() const = 0;
     /**
-     * @internal
      * @return the beginning year of the default century, as a year
+     * @internal
      */
     virtual int32_t defaultCenturyStartYear() const = 0;
 
@@ -2410,6 +2404,20 @@ private:
      *  @stable ICU 2.8
      */
     Locale getLocale(ULocDataLocaleType type, UErrorCode &status) const;
+
+    /**
+     * @return      The related Gregorian year; will be obtained by modifying the value
+     *              obtained by get from UCAL_EXTENDED_YEAR field
+     * @internal
+     */
+    virtual int32_t getRelatedYear(UErrorCode &status) const;
+
+    /**
+     * @param year  The related Gregorian year to set; will be modified as necessary then
+     *              set in UCAL_EXTENDED_YEAR field
+     * @internal
+     */
+    virtual void setRelatedYear(int32_t year);
 
 #ifndef U_HIDE_INTERNAL_API
     /** Get the locale for this calendar object. You can choose between valid and actual locale.
@@ -2427,6 +2435,45 @@ private:
      * is not an instance of BasicTimeZone.
      */
     BasicTimeZone* getBasicTimeZone() const;
+
+    /**
+     * Find the previous zone transition near the given time.
+     * @param base The base time, inclusive
+     * @param transitionTime Receives the result time
+     * @param status The error status
+     * @return TRUE if a transition is found.
+     */
+    UBool getImmediatePreviousZoneTransition(UDate base, UDate *transitionTime, UErrorCode& status) const;
+
+public:
+#ifndef U_HIDE_INTERNAL_API
+    /**
+     * Creates a new Calendar from a Locale for the cache.
+     * This method does not set the time or timezone in returned calendar.
+     * @param locale the locale.
+     * @param status any error returned here.
+     * @return the new Calendar object with no time or timezone set.
+     * @internal For ICU use only.
+     */
+    static Calendar * U_EXPORT2 makeInstance(
+            const Locale &locale, UErrorCode &status);
+
+    /**
+     * Get the calendar type for given locale.
+     * @param locale the locale
+     * @param typeBuffer calendar type returned here
+     * @param typeBufferSize The size of typeBuffer in bytes. If the type
+     *   can't fit in the buffer, this method sets status to
+     *   U_BUFFER_OVERFLOW_ERROR
+     * @param status error, if any, returned here.
+     * @internal For ICU use only.
+     */
+    static void U_EXPORT2 getCalendarTypeFromLocale(
+            const Locale &locale,
+            char *typeBuffer,
+            int32_t typeBufferSize,
+            UErrorCode &status);
+#endif  /* U_HIDE_INTERNAL_API */
 };
 
 // -------------------------------------
@@ -2452,7 +2499,7 @@ Calendar::roll(EDateFields field, UBool up, UErrorCode& status)
 {
     roll((UCalendarDateFields) field, up, status);
 }
-#endif
+#endif  /* U_HIDE_DEPRECATED_API */
 
 
 // -------------------------------------
@@ -2476,7 +2523,7 @@ inline int32_t  Calendar::weekNumber(int32_t dayOfPeriod, int32_t dayOfWeek)
 {
   return weekNumber(dayOfPeriod, dayOfPeriod, dayOfWeek);
 }
-#endif
+#endif  /* U_HIDE_INTERNAL_API */
 
 U_NAMESPACE_END
 

@@ -1,0 +1,4 @@
+subdirs = [
+    "android",
+    "dist",
+]

@@ -38,10 +38,4 @@ public @interface TestTargetClass {
      * Specifies the class being tested.
      */
     Class<?> value();
-
-    /**
-     * Option to specify untested methods for the class.
-     * @hide
-     */
-    TestTargetNew[] untestedMethods() default {};
 }

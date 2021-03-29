@@ -20,8 +20,9 @@
 
 #include <stdlib.h>
 
-#include "cutils/log.h"
-#include "ScopedLocalRef.h"
+#include <log/log.h>
+
+#include <nativehelper/ScopedLocalRef.h>
 
 ExecStrings::ExecStrings(JNIEnv* env, jobjectArray java_string_array)
     : env_(env), java_array_(java_string_array), array_(NULL) {

@@ -18,17 +18,22 @@ package libcore.reflect;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.Objects;
 
 public final class ParameterizedTypeImpl implements ParameterizedType {
     private final ListOfTypes args;
     private final ParameterizedTypeImpl ownerType0; // Potentially unresolved.
-    private Type ownerTypeRes;
-    private Class rawType; // Already resolved.
+    private Type ownerTypeRes; // Potentially unresolved.
+    private Class rawType; // Potentially unresolved.
     private final String rawTypeName;
-    private ClassLoader loader;
+    private final ClassLoader loader;
 
     public ParameterizedTypeImpl(ParameterizedTypeImpl ownerType, String rawTypeName,
             ListOfTypes args, ClassLoader loader) {
+        if (args == null) {
+            throw new NullPointerException();
+        }
         this.ownerType0 = ownerType;
         this.rawTypeName = rawTypeName;
         this.args = args;
@@ -37,7 +42,6 @@ public final class ParameterizedTypeImpl implements ParameterizedType {
 
 
     public Type[] getActualTypeArguments() {
-        // ASSUMPTION: args is never null!!!
         return args.getResolvedTypes().clone();
     }
 
@@ -73,6 +77,23 @@ public final class ParameterizedTypeImpl implements ParameterizedType {
         } else {
             return this;
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof ParameterizedType)) {
+            return false;
+        }
+        ParameterizedType that = (ParameterizedType) o;
+        return Objects.equals(getRawType(), that.getRawType()) &&
+                Objects.equals(getOwnerType(), that.getOwnerType()) &&
+                Arrays.equals(args.getResolvedTypes(), that.getActualTypeArguments());
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * (31 * Objects.hashCode(getRawType()) + Objects.hashCode(getOwnerType())) +
+            Arrays.hashCode(args.getResolvedTypes());
     }
 
     @Override

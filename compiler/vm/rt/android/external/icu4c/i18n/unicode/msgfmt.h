@@ -1,5 +1,7 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
-* Copyright (C) 2007-2012, International Business Machines Corporation and
+* Copyright (C) 2007-2013, International Business Machines Corporation and
 * others. All Rights Reserved.
 ********************************************************************************
 *
@@ -36,7 +38,7 @@
 U_CDECL_BEGIN
 // Forward declaration.
 struct UHashtable;
-typedef struct UHashtable UHashtable;
+typedef struct UHashtable UHashtable; /**< @internal */
 U_CDECL_END
 
 U_NAMESPACE_BEGIN
@@ -122,7 +124,7 @@ class NumberFormat;
  * argNumber = '0' | ('1'..'9' ('0'..'9')*)
  *
  * argType = "number" | "date" | "time" | "spellout" | "ordinal" | "duration"
- * argStyle = "short" | "medium" | "long" | "full" | "integer" | "currency" | "percent" | argStyleText
+ * argStyle = "short" | "medium" | "long" | "full" | "integer" | "currency" | "percent" | argStyleText | "::" argSkeletonText
  * </pre>
  *
  * <ul>
@@ -164,7 +166,7 @@ class NumberFormat;
  *       <td colspan=2><i>(none)</i>
  *       <td><code>null</code>
  *    <tr>
- *       <td rowspan=5><code>number</code>
+ *       <td rowspan=6><code>number</code>
  *       <td><i>(none)</i>
  *       <td><code>NumberFormat.createInstance(getLocale(), status)</code>
  *    <tr>
@@ -179,6 +181,9 @@ class NumberFormat;
  *    <tr>
  *       <td><i>argStyleText</i>
  *       <td><code>new DecimalFormat(argStyleText, new DecimalFormatSymbols(getLocale(), status), status)</code>
+ *    <tr>
+ *       <td><i>argSkeletonText</i>
+ *       <td><code>NumberFormatter::forSkeleton(argSkeletonText, status).locale(getLocale()).toFormat(status)</code>
  *    <tr>
  *       <td rowspan=6><code>date</code>
  *       <td><i>(none)</i>
@@ -197,7 +202,7 @@ class NumberFormat;
  *       <td><code>DateFormat.createDateInstance(kFull, getLocale(), status)</code>
  *    <tr>
  *       <td><i>argStyleText</i>
- *       <td><code>new SimpleDateFormat(argStyleText, getLocale(), status)
+ *       <td><code>new SimpleDateFormat(argStyleText, getLocale(), status)</code>
  *    <tr>
  *       <td rowspan=6><code>time</code>
  *       <td><i>(none)</i>
@@ -216,7 +221,7 @@ class NumberFormat;
  *       <td><code>DateFormat.createTimeInstance(kFull, getLocale(), status)</code>
  *    <tr>
  *       <td><i>argStyleText</i>
- *       <td><code>new SimpleDateFormat(argStyleText, getLocale(), status)
+ *       <td><code>new SimpleDateFormat(argStyleText, getLocale(), status)</code>
  *    <tr>
  *       <td><code>spellout</code>
  *       <td><i>argStyleText (optional)</i>
@@ -696,25 +701,6 @@ public:
                                   UErrorCode& status) const;
 
     /**
-     * Formats the given array of arguments into a user-readable
-     * string.  The array must be stored within a single Formattable
-     * object of type kArray. If the Formattable object type is not of
-     * type kArray, then returns a failing UErrorCode.
-     *
-     * @param obj       The object to format
-     * @param appendTo  Output parameter to receive result.
-     *                  Result is appended to existing contents.
-     * @param status    Input/output error code.  If the
-     *                  pattern cannot be parsed, set to failure code.
-     * @return          Reference to 'appendTo' parameter.
-     * @stable ICU 2.0
-     */
-    UnicodeString& format(const Formattable& obj,
-                          UnicodeString& appendTo,
-                          UErrorCode& status) const;
-
-
-    /**
      * Formats the given array of arguments into a user-defined argument name
      * array. This function supports both named and numbered
      * arguments-- if numbered, the formatName is the
@@ -893,13 +879,13 @@ private:
       */
     class U_I18N_API PluralSelectorProvider : public PluralFormat::PluralSelector {
     public:
-        PluralSelectorProvider(const Locale* loc, UPluralType type);
+        PluralSelectorProvider(const MessageFormat &mf, UPluralType type);
         virtual ~PluralSelectorProvider();
-        virtual UnicodeString select(double number, UErrorCode& ec) const;
+        virtual UnicodeString select(void *ctx, double number, UErrorCode& ec) const;
 
-        void reset(const Locale* loc);
+        void reset();
     private:
-        const Locale* locale;
+        const MessageFormat &msgFormat;
         PluralRules* rules;
         UPluralType type;
     };
@@ -956,7 +942,7 @@ private:
      * @return the index of the list which matches the keyword s.
      */
     static int32_t findKeyword( const UnicodeString& s,
-                                const UChar * const *list);
+                                const char16_t * const *list);
 
     /**
      * Thin wrapper around the format(... AppendableWrapper ...) variant.
@@ -975,7 +961,7 @@ private:
      * AppendableWrapper, updates the field position.
      *
      * @param msgStart      Index to msgPattern part to start formatting from.
-     * @param pluralNumber  Zero except when formatting a plural argument sub-message
+     * @param plNumber      NULL except when formatting a plural argument sub-message
      *                      where a '#' is replaced by the format string for this number.
      * @param arguments     The formattable objects array. (Must not be NULL.)
      * @param argumentNames NULL if numbered values are used. Otherwise the same
@@ -988,7 +974,7 @@ private:
      * @param success       The error code status.
      */
     void format(int32_t msgStart,
-                double pluralNumber,
+                const void *plNumber,
                 const Formattable* arguments,
                 const UnicodeString *argumentNames,
                 int32_t cnt,
@@ -1027,6 +1013,20 @@ private:
     FieldPosition* updateMetaData(AppendableWrapper& dest, int32_t prevLength,
                                   FieldPosition* fp, const Formattable* argId) const;
 
+    /**
+     * Finds the "other" sub-message.
+     * @param partIndex the index of the first PluralFormat argument style part.
+     * @return the "other" sub-message start part index.
+     */
+    int32_t findOtherSubMessage(int32_t partIndex) const;
+
+    /**
+     * Returns the ARG_START index of the first occurrence of the plural number in a sub-message.
+     * Returns -1 if it is a REPLACE_NUMBER.
+     * Returns 0 if there is neither.
+     */
+    int32_t findFirstPluralNumberArg(int32_t msgStart, const UnicodeString &argName) const;
+
     Format* getCachedFormatter(int32_t argumentNumber) const;
 
     UnicodeString getLiteralStringUntilNextArgument(int32_t from) const;
@@ -1034,7 +1034,7 @@ private:
     void copyObjects(const MessageFormat& that, UErrorCode& ec);
 
     void formatComplexSubMessage(int32_t msgStart,
-                                 double pluralNumber,
+                                 const void *plNumber,
                                  const Formattable* arguments,
                                  const UnicodeString *argumentNames,
                                  int32_t cnt,
@@ -1052,7 +1052,6 @@ private:
      * for public consumption.
      * @param listCount  Output parameter to receive the size of array
      * @return           The array of formattable types in the pattern
-     * @internal
      */
     const Formattable::Type* getArgTypeList(int32_t& listCount) const {
         listCount = argTypeCount;
@@ -1067,11 +1066,9 @@ private:
     /**
      * A DummyFormatter that we use solely to store a NULL value. UHash does
      * not support storing NULL values.
-     * @internal
      */
     class U_I18N_API DummyFormat : public Format {
     public:
-        using Format::format;
         virtual UBool operator==(const Format&) const;
         virtual Format* clone() const;
         virtual UnicodeString& format(const Formattable& obj,
@@ -1092,14 +1089,6 @@ private:
 
     friend class MessageFormatAdapter; // getFormatTypeList() access
 };
-
-inline UnicodeString&
-MessageFormat::format(const Formattable& obj,
-                      UnicodeString& appendTo,
-                      UErrorCode& status) const {
-    return Format::format(obj, appendTo, status);
-}
-
 
 U_NAMESPACE_END
 

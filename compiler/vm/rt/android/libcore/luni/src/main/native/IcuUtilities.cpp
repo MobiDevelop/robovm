@@ -16,23 +16,20 @@
 
 #define LOG_TAG "IcuUtilities"
 
+#include <android/log.h>
+#include <nativehelper/JNIHelp.h>
+#include <nativehelper/ScopedLocalRef.h>
+#include <nativehelper/ScopedUtfChars.h>
+
 #include "IcuUtilities.h"
 
 #include "JniConstants.h"
 #include "JniException.h"
-#include "ScopedLocalRef.h"
-#include "ScopedUtfChars.h"
-#include "UniquePtr.h"
-#include "cutils/log.h"
 #include "unicode/strenum.h"
-#include "unicode/uloc.h"
 #include "unicode/ustring.h"
+#include "unicode/uloc.h"
 
-Locale getLocale(JNIEnv* env, jstring localeName) {
-  return Locale::createFromName(ScopedUtfChars(env, localeName).c_str());
-}
-
-jobjectArray fromStringEnumeration(JNIEnv* env, UErrorCode& status, const char* provider, StringEnumeration* se) {
+jobjectArray fromStringEnumeration(JNIEnv* env, UErrorCode& status, const char* provider, icu::StringEnumeration* se) {
   if (maybeThrowIcuException(env, provider, status)) {
     return NULL;
   }
@@ -42,13 +39,13 @@ jobjectArray fromStringEnumeration(JNIEnv* env, UErrorCode& status, const char* 
     return NULL;
   }
 
-  jobjectArray result = env->NewObjectArray(count, JniConstants::stringClass, NULL);
+  jobjectArray result = env->NewObjectArray(count, JniConstants::GetStringClass(env), NULL);
   for (int32_t i = 0; i < count; ++i) {
-    const UnicodeString* string = se->snext(status);
+    const icu::UnicodeString* string = se->snext(status);
     if (maybeThrowIcuException(env, "StringEnumeration::snext", status)) {
       return NULL;
     }
-    ScopedLocalRef<jstring> javaString(env, env->NewString(string->getBuffer(), string->length()));
+    ScopedLocalRef<jstring> javaString(env, jniCreateString(env, string->getBuffer(), string->length()));
     env->SetObjectArrayElement(result, i, javaString.get());
   }
   return result;
@@ -65,6 +62,8 @@ bool maybeThrowIcuException(JNIEnv* env, const char* function, UErrorCode error)
     exceptionClass = "java/lang/ArrayIndexOutOfBoundsException";
   } else if (error == U_UNSUPPORTED_ERROR) {
     exceptionClass = "java/lang/UnsupportedOperationException";
+  } else if (error == U_FORMAT_INEXACT_ERROR) {
+    exceptionClass = "java/lang/ArithmeticException";
   }
   jniThrowExceptionFmt(env, exceptionClass, "%s failed: %s", function, u_errorName(error));
   return true;

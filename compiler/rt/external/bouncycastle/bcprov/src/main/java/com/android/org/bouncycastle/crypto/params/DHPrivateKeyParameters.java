@@ -1,0 +1,45 @@
+/* GENERATED SOURCE. DO NOT MODIFY. */
+package com.android.org.bouncycastle.crypto.params;
+
+import java.math.BigInteger;
+
+/**
+ * @hide This class is not part of the Android public SDK API
+ */
+public class DHPrivateKeyParameters
+    extends DHKeyParameters
+{
+    private BigInteger      x;
+
+    public DHPrivateKeyParameters(
+        BigInteger      x,
+        DHParameters    params)
+    {
+        super(true, params);
+
+        this.x = x;
+    }   
+
+    public BigInteger getX()
+    {
+        return x;
+    }
+
+    public int hashCode()
+    {
+        return x.hashCode() ^ super.hashCode();
+    }
+    
+    public boolean equals(
+        Object  obj)
+    {
+        if (!(obj instanceof DHPrivateKeyParameters))
+        {
+            return false;
+        }
+
+        DHPrivateKeyParameters  other = (DHPrivateKeyParameters)obj;
+
+        return other.getX().equals(this.x) && super.equals(obj);
+    }
+}

@@ -16,6 +16,23 @@
 
 package libcore.io;
 
+import android.system.ErrnoException;
+import android.system.GaiException;
+import android.system.Int32Ref;
+import android.system.Int64Ref;
+import android.system.StructAddrinfo;
+import android.system.StructFlock;
+import android.system.StructGroupReq;
+import android.system.StructIfaddrs;
+import android.system.StructLinger;
+import android.system.StructPasswd;
+import android.system.StructPollfd;
+import android.system.StructStat;
+import android.system.StructStatVfs;
+import android.system.StructTimeval;
+import android.system.StructUcred;
+import android.system.StructUtsname;
+
 import java.io.FileDescriptor;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -23,8 +40,6 @@ import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.NioUtils;
-import libcore.util.MutableInt;
-import libcore.util.MutableLong;
 
 public final class Posix implements Os {
     Posix() { }
@@ -70,12 +85,11 @@ public final class Posix implements Os {
     public native StructLinger getsockoptLinger(FileDescriptor fd, int level, int option) throws ErrnoException;
     public native StructTimeval getsockoptTimeval(FileDescriptor fd, int level, int option) throws ErrnoException;
     public native StructUcred getsockoptUcred(FileDescriptor fd, int level, int option) throws ErrnoException;
-    public native int gettid();
     public native int getuid();
     public native String if_indextoname(int index);
     public native InetAddress inet_pton(int family, String address);
     public native InetAddress ioctlInetAddress(FileDescriptor fd, int cmd, String interfaceName) throws ErrnoException;
-    public native int ioctlInt(FileDescriptor fd, int cmd, MutableInt arg) throws ErrnoException;
+    public native int ioctlInt(FileDescriptor fd, int cmd, Int32Ref arg) throws ErrnoException;
     public native boolean isatty(FileDescriptor fd);
     public native void kill(int pid, int signal) throws ErrnoException;
     public native void lchown(String path, int uid, int gid) throws ErrnoException;
@@ -143,7 +157,7 @@ public final class Posix implements Os {
     private native int recvfromBytes(FileDescriptor fd, Object buffer, int byteOffset, int byteCount, int flags, InetSocketAddress srcAddress) throws ErrnoException, SocketException;
     public native void remove(String path) throws ErrnoException;
     public native void rename(String oldPath, String newPath) throws ErrnoException;
-    public native long sendfile(FileDescriptor outFd, FileDescriptor inFd, MutableLong inOffset, long byteCount) throws ErrnoException;
+    public native long sendfile(FileDescriptor outFd, FileDescriptor inFd, Int64Ref inOffset, long byteCount) throws ErrnoException;
     public int sendto(FileDescriptor fd, ByteBuffer buffer, int flags, InetAddress inetAddress, int port) throws ErrnoException, SocketException {
         if (buffer.isDirect()) {
             return sendtoBytes(fd, buffer, buffer.position(), buffer.remaining(), flags, inetAddress, port);
@@ -189,7 +203,7 @@ public final class Posix implements Os {
     private native int umaskImpl(int mask);
     public native StructUtsname uname();
     public native void unsetenv(String name) throws ErrnoException;
-    public native int waitpid(int pid, MutableInt status, int options) throws ErrnoException;
+    public native int waitpid(int pid, Int32Ref status, int options) throws ErrnoException;
     public int write(FileDescriptor fd, ByteBuffer buffer) throws ErrnoException {
         if (buffer.isDirect()) {
             return writeBytes(fd, buffer, buffer.position(), buffer.remaining());
@@ -203,4 +217,16 @@ public final class Posix implements Os {
     }
     private native int writeBytes(FileDescriptor fd, Object buffer, int offset, int byteCount) throws ErrnoException;
     public native int writev(FileDescriptor fd, Object[] buffers, int[] offsets, int[] byteCounts) throws ErrnoException;
+
+    @Override
+    public native StructIfaddrs[] getifaddrs() throws ErrnoException;
+
+    @Override
+    public native int if_nametoindex(String name);
+
+    @Override
+    public native int ioctlFlags(FileDescriptor fd, String interfaceName) throws ErrnoException;
+
+    @Override
+    public native int ioctlMTU(FileDescriptor fd, String interfaceName) throws ErrnoException;
 }

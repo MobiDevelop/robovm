@@ -1,12 +1,14 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
 *******************************************************************************
 *
-*   Copyright (C) 1999-2010, International Business Machines
+*   Copyright (C) 1999-2015, International Business Machines
 *   Corporation and others.  All Rights Reserved.
 *
 *******************************************************************************
 *   file name:  uinvchar.h
-*   encoding:   US-ASCII
+*   encoding:   UTF-8
 *   tab size:   8 (not used)
 *   indentation:2
 *
@@ -21,6 +23,9 @@
 #define __UINVCHAR_H__
 
 #include "unicode/utypes.h"
+#ifdef __cplusplus
+#include "unicode/unistr.h"
+#endif
 
 /**
  * Check if a char string only contains invariant characters.

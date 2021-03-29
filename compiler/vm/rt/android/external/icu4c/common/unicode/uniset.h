@@ -1,6 +1,8 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
 ***************************************************************************
-* Copyright (C) 1999-2011, International Business Machines Corporation
+* Copyright (C) 1999-2016, International Business Machines Corporation
 * and others. All Rights Reserved.
 ***************************************************************************
 *   Date        Name        Description
@@ -11,6 +13,7 @@
 #ifndef UNICODESET_H
 #define UNICODESET_H
 
+#include "unicode/ucpmap.h"
 #include "unicode/unifilt.h"
 #include "unicode/unistr.h"
 #include "unicode/uset.h"
@@ -22,6 +25,7 @@
 
 U_NAMESPACE_BEGIN
 
+// Forward Declarations.
 class BMPSet;
 class ParsePosition;
 class RBBIRuleScanner;
@@ -270,15 +274,24 @@ class RuleCharacterIterator;
  * @author Alan Liu
  * @stable ICU 2.0
  */
-class U_COMMON_API UnicodeSet : public UnicodeFilter {
+class U_COMMON_API UnicodeSet U_FINAL : public UnicodeFilter {
+private:
+    /**
+     * Enough for sets with few ranges.
+     * For example, White_Space has 10 ranges, list length 21.
+     */
+    static constexpr int32_t INITIAL_CAPACITY = 25;
+    // fFlags constant
+    static constexpr uint8_t kIsBogus = 1;  // This set is bogus (i.e. not valid)
 
-    int32_t len; // length of list used; 0 <= len <= capacity
-    int32_t capacity; // capacity of list
-    UChar32* list; // MUST be terminated with HIGH
-    BMPSet *bmpSet; // The set is frozen iff either bmpSet or stringSpan is not NULL.
-    UChar32* buffer; // internal buffer, may be NULL
-    int32_t bufferCapacity; // capacity of buffer
-    int32_t patLen;
+    UChar32* list = stackList; // MUST be terminated with HIGH
+    int32_t capacity = INITIAL_CAPACITY; // capacity of list
+    int32_t len = 1; // length of list used; 1 <= len <= capacity
+    uint8_t fFlags = 0;         // Bit flag (see constants above)
+
+    BMPSet *bmpSet = nullptr; // The set is frozen iff either bmpSet or stringSpan is not NULL.
+    UChar32* buffer = nullptr; // internal buffer, may be NULL
+    int32_t bufferCapacity = 0; // capacity of buffer
 
     /**
      * The pattern representation of this set.  This may not be the
@@ -289,27 +302,31 @@ class U_COMMON_API UnicodeSet : public UnicodeFilter {
      * indicating that toPattern() must generate a pattern
      * representation from the inversion list.
      */
-    UChar *pat;
-    UVector* strings; // maintained in sorted order
-    UnicodeSetStringSpan *stringSpan;
+    char16_t *pat = nullptr;
+    int32_t patLen = 0;
 
-private:
-    enum { // constants
-        kIsBogus = 1       // This set is bogus (i.e. not valid)
-    };
-    uint8_t fFlags;         // Bit flag (see constants above)
+    UVector* strings = nullptr; // maintained in sorted order
+    UnicodeSetStringSpan *stringSpan = nullptr;
+
+    /**
+     * Initial list array.
+     * Avoids some heap allocations, and list is never nullptr.
+     * Increases the object size a bit.
+     */
+    UChar32 stackList[INITIAL_CAPACITY];
+
 public:
     /**
      * Determine if this object contains a valid set.
      * A bogus set has no value. It is different from an empty set.
      * It can be used to indicate that no set value is available.
      *
-     * @return TRUE if the set is valid, FALSE otherwise
+     * @return TRUE if the set is bogus/invalid, FALSE otherwise
      * @see setToBogus()
      * @stable ICU 4.0
      */
     inline UBool isBogus(void) const;
-    
+
     /**
      * Make this UnicodeSet object invalid.
      * The string will test TRUE with isBogus().
@@ -357,7 +374,7 @@ public:
     UnicodeSet();
 
     /**
-     * Constructs a set containing the given range. If <code>end >
+     * Constructs a set containing the given range. If <code>end <
      * start</code> then an empty set is created.
      *
      * @param start first character, inclusive, of range
@@ -365,6 +382,28 @@ public:
      * @stable ICU 2.4
      */
     UnicodeSet(UChar32 start, UChar32 end);
+
+#ifndef U_HIDE_INTERNAL_API
+    /**
+     * @internal
+     */
+    enum ESerialization {
+      kSerialized  /* result of serialize() */
+    };
+
+    /**
+     * Constructs a set from the output of serialize().
+     *
+     * @param buffer the 16 bit array
+     * @param bufferLen the original length returned from serialize()
+     * @param serialization the value 'kSerialized'
+     * @param status error code
+     *
+     * @internal
+     */
+    UnicodeSet(const uint16_t buffer[], int32_t bufferLen,
+               ESerialization serialization, UErrorCode &status);
+#endif  /* U_HIDE_INTERNAL_API */
 
     /**
      * Constructs a set from the given pattern.  See the class
@@ -557,9 +596,8 @@ public:
     //----------------------------------------------------------------
 
     /**
-     * Make this object represent the range <code>start - end</code>.
-     * If <code>end > start</code> then this object is set to an
-     * an empty range.
+     * Make this object represent the range `start - end`.
+     * If `end > start` then this object is set to an empty range.
      * A frozen set will not be modified.
      *
      * @param start first character in the set, inclusive
@@ -864,7 +902,7 @@ public:
      * @stable ICU 3.8
      * @see USetSpanCondition
      */
-    int32_t span(const UChar *s, int32_t length, USetSpanCondition spanCondition) const;
+    int32_t span(const char16_t *s, int32_t length, USetSpanCondition spanCondition) const;
 
     /**
      * Returns the end of the substring of the input string according to the USetSpanCondition.
@@ -897,7 +935,7 @@ public:
      * @stable ICU 3.8
      * @see USetSpanCondition
      */
-    int32_t spanBack(const UChar *s, int32_t length, USetSpanCondition spanCondition) const;
+    int32_t spanBack(const char16_t *s, int32_t length, USetSpanCondition spanCondition) const;
 
     /**
      * Returns the start of the substring of the input string according to the USetSpanCondition.
@@ -1454,8 +1492,6 @@ private:
 
     friend class USetAccess;
 
-    int32_t getStringCount() const;
-
     const UnicodeString* getString(int32_t index) const;
 
     //----------------------------------------------------------------
@@ -1479,6 +1515,7 @@ private:
     //----------------------------------------------------------------
 
     UnicodeSet(const UnicodeSet& o, UBool /* asThawed */);
+    UnicodeSet& copyFrom(const UnicodeSet& o, UBool asThawed);
 
     //----------------------------------------------------------------
     // Implementation: Pattern parsing
@@ -1494,19 +1531,25 @@ private:
                       UnicodeString& rebuiltPat,
                       uint32_t options,
                       UnicodeSet& (UnicodeSet::*caseClosure)(int32_t attribute),
+                      int32_t depth,
                       UErrorCode& ec);
 
     //----------------------------------------------------------------
     // Implementation: Utility methods
     //----------------------------------------------------------------
 
-    void ensureCapacity(int32_t newLen, UErrorCode& ec);
+    static int32_t nextCapacity(int32_t minCapacity);
 
-    void ensureBufferCapacity(int32_t newLen, UErrorCode& ec);
+    bool ensureCapacity(int32_t newLen);
+
+    bool ensureBufferCapacity(int32_t newLen);
 
     void swapBuffers(void);
 
     UBool allocateStrings(UErrorCode &status);
+    UBool hasStrings() const;
+    int32_t stringsSize() const;
+    UBool stringsContains(const UnicodeString &s) const;
 
     UnicodeString& _toPattern(UnicodeString& result,
                               UBool escapeUnprintable) const;
@@ -1605,13 +1648,22 @@ private:
      */
     void applyFilter(Filter filter,
                      void* context,
-                     int32_t src,
+                     const UnicodeSet* inclusions,
                      UErrorCode &status);
+
+#ifndef U_HIDE_DRAFT_API   // Skipped: ucpmap.h is draft only.
+    void applyIntPropertyValue(const UCPMap *map,
+                               UCPMapValueFilter *filter, const void *context,
+                               UErrorCode &errorCode);
+#endif  /* U_HIDE_DRAFT_API */
 
     /**
      * Set the new pattern to cache.
      */
-    void setPattern(const UnicodeString& newPat);
+    void setPattern(const UnicodeString& newPat) {
+        setPattern(newPat.getBuffer(), newPat.length());
+    }
+    void setPattern(const char16_t *newPat, int32_t newPatLen);
     /**
      * Release existing cached pattern.
      */

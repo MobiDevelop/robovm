@@ -18,31 +18,9 @@
 #include <string.h>
 #include "cbigint.h"
 
-#if defined(__linux__) || defined(__APPLE__)
-#define USE_LL
-#endif
-
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-#define at(i) (i)
-#else
-#define at(i) ((i)^1)
-/* the sequence for halfAt is -1, 2, 1, 4, 3, 6, 5, 8... */
-/* and it should correspond to 0, 1, 2, 3, 4, 5, 6, 7... */
-#define halfAt(i) (-((-(i)) ^ 1))
-#endif
-
 #define HIGH_IN_U64(u64) ((u64) >> 32)
-#if defined(USE_LL)
 #define LOW_IN_U64(u64) ((u64) & 0x00000000FFFFFFFFLL)
-#else
-#if defined(USE_L)
-#define LOW_IN_U64(u64) ((u64) & 0x00000000FFFFFFFFL)
-#else
-#define LOW_IN_U64(u64) ((u64) & 0x00000000FFFFFFFF)
-#endif /* USE_L */
-#endif /* USE_LL */
 
-#if defined(USE_LL)
 #define TEN_E1 (0xALL)
 #define TEN_E2 (0x64LL)
 #define TEN_E3 (0x3E8LL)
@@ -53,54 +31,15 @@
 #define TEN_E8 (0x5F5E100LL)
 #define TEN_E9 (0x3B9ACA00LL)
 #define TEN_E19 (0x8AC7230489E80000LL)
-#else
-#if defined(USE_L)
-#define TEN_E1 (0xAL)
-#define TEN_E2 (0x64L)
-#define TEN_E3 (0x3E8L)
-#define TEN_E4 (0x2710L)
-#define TEN_E5 (0x186A0L)
-#define TEN_E6 (0xF4240L)
-#define TEN_E7 (0x989680L)
-#define TEN_E8 (0x5F5E100L)
-#define TEN_E9 (0x3B9ACA00L)
-#define TEN_E19 (0x8AC7230489E80000L)
-#else
-#define TEN_E1 (0xA)
-#define TEN_E2 (0x64)
-#define TEN_E3 (0x3E8)
-#define TEN_E4 (0x2710)
-#define TEN_E5 (0x186A0)
-#define TEN_E6 (0xF4240)
-#define TEN_E7 (0x989680)
-#define TEN_E8 (0x5F5E100)
-#define TEN_E9 (0x3B9ACA00)
-#define TEN_E19 (0x8AC7230489E80000)
-#endif /* USE_L */
-#endif /* USE_LL */
 
 #define TIMES_TEN(x) (((x) << 3) + ((x) << 1))
 #define bitSection(x, mask, shift) (((x) & (mask)) >> (shift))
 #define CREATE_DOUBLE_BITS(normalizedM, e) (((normalizedM) & MANTISSA_MASK) | ((static_cast<uint64_t>((e) + E_OFFSET)) << 52))
 
-#if defined(USE_LL)
 #define MANTISSA_MASK (0x000FFFFFFFFFFFFFLL)
 #define EXPONENT_MASK (0x7FF0000000000000LL)
 #define NORMAL_MASK (0x0010000000000000LL)
 #define SIGN_MASK (0x8000000000000000LL)
-#else
-#if defined(USE_L)
-#define MANTISSA_MASK (0x000FFFFFFFFFFFFFL)
-#define EXPONENT_MASK (0x7FF0000000000000L)
-#define NORMAL_MASK (0x0010000000000000L)
-#define SIGN_MASK (0x8000000000000000L)
-#else
-#define MANTISSA_MASK (0x000FFFFFFFFFFFFF)
-#define EXPONENT_MASK (0x7FF0000000000000)
-#define NORMAL_MASK (0x0010000000000000)
-#define SIGN_MASK (0x8000000000000000)
-#endif /* USE_L */
-#endif /* USE_LL */
 
 #define E_OFFSET (1075)
 
@@ -229,52 +168,27 @@ simpleMultiplyAddHighPrecision (uint64_t * arg1, int32_t length, uint64_t arg2,
   do
     {
       product =
-        HIGH_IN_U64 (product) + result[at (resultIndex)] +
+        HIGH_IN_U64 (product) + result[resultIndex] +
         arg2 * LOW_U32_FROM_PTR (arg1 + index);
-      result[at (resultIndex)] = LOW_U32_FROM_VAR (product);
+      result[resultIndex] = LOW_U32_FROM_VAR (product);
       ++resultIndex;
       product =
-        HIGH_IN_U64 (product) + result[at (resultIndex)] +
+        HIGH_IN_U64 (product) + result[resultIndex] +
         arg2 * HIGH_U32_FROM_PTR (arg1 + index);
-      result[at (resultIndex)] = LOW_U32_FROM_VAR (product);
+      result[resultIndex] = LOW_U32_FROM_VAR (product);
       ++resultIndex;
     }
   while (++index < length);
 
-  result[at (resultIndex)] += HIGH_U32_FROM_VAR (product);
-  if (result[at (resultIndex)] < HIGH_U32_FROM_VAR (product))
+  result[resultIndex] += HIGH_U32_FROM_VAR (product);
+  if (result[resultIndex] < HIGH_U32_FROM_VAR (product))
     {
       /* must be careful with ++ operator and macro expansion */
       ++resultIndex;
-      while (++result[at (resultIndex)] == 0)
+      while (++result[resultIndex] == 0)
         ++resultIndex;
     }
 }
-
-#if __BYTE_ORDER != __LITTLE_ENDIAN
-void simpleMultiplyAddHighPrecisionBigEndianFix(uint64_t* arg1, int32_t length, uint64_t arg2, uint32_t* result) {
-    /* Assumes result can hold the product and arg2 only holds 32 bits of information */
-    int32_t index = 0;
-    int32_t resultIndex = 0;
-    uint64_t product = 0;
-
-    do {
-        product = HIGH_IN_U64(product) + result[halfAt(resultIndex)] + arg2 * LOW_U32_FROM_PTR(arg1 + index);
-        result[halfAt(resultIndex)] = LOW_U32_FROM_VAR(product);
-        ++resultIndex;
-        product = HIGH_IN_U64(product) + result[halfAt(resultIndex)] + arg2 * HIGH_U32_FROM_PTR(arg1 + index);
-        result[halfAt(resultIndex)] = LOW_U32_FROM_VAR(product);
-        ++resultIndex;
-    } while (++index < length);
-
-    result[halfAt(resultIndex)] += HIGH_U32_FROM_VAR(product);
-    if (result[halfAt(resultIndex)] < HIGH_U32_FROM_VAR(product)) {
-        /* must be careful with ++ operator and macro expansion */
-        ++resultIndex;
-        while (++result[halfAt(resultIndex)] == 0) ++resultIndex;
-    }
-}
-#endif
 
 void
 multiplyHighPrecision (uint64_t * arg1, int32_t length1, uint64_t * arg2, int32_t length2,
@@ -304,11 +218,7 @@ multiplyHighPrecision (uint64_t * arg1, int32_t length1, uint64_t * arg2, int32_
     {
       simpleMultiplyAddHighPrecision (arg1, length1, LOW_IN_U64 (arg2[count]),
                                       resultIn32 + (++index));
-#if __BYTE_ORDER == __LITTLE_ENDIAN
       simpleMultiplyAddHighPrecision(arg1, length1, HIGH_IN_U64(arg2[count]), resultIn32 + (++index));
-#else
-      simpleMultiplyAddHighPrecisionBigEndianFix(arg1, length1, HIGH_IN_U64(arg2[count]), resultIn32 + (++index));
-#endif
     }
 }
 
@@ -374,7 +284,6 @@ highestSetBit (uint64_t * y)
   if (*y == 0)
     return 0;
 
-#if defined(USE_LL)
   if (*y & 0xFFFFFFFF00000000LL)
     {
       x = HIGH_U32_FROM_PTR (y);
@@ -385,31 +294,6 @@ highestSetBit (uint64_t * y)
       x = LOW_U32_FROM_PTR (y);
       result = 0;
     }
-#else
-#if defined(USE_L)
-  if (*y & 0xFFFFFFFF00000000L)
-    {
-      x = HIGH_U32_FROM_PTR (y);
-      result = 32;
-    }
-  else
-    {
-      x = LOW_U32_FROM_PTR (y);
-      result = 0;
-    }
-#else
-  if (*y & 0xFFFFFFFF00000000)
-    {
-      x = HIGH_U32_FROM_PTR (y);
-      result = 32;
-    }
-  else
-    {
-      x = LOW_U32_FROM_PTR (y);
-      result = 0;
-    }
-#endif /* USE_L */
-#endif /* USE_LL */
 
   if (x & 0xFFFF0000)
     {
@@ -445,7 +329,6 @@ lowestSetBit (uint64_t * y)
   if (*y == 0)
     return 0;
 
-#if defined(USE_LL)
   if (*y & 0x00000000FFFFFFFFLL)
     {
       x = LOW_U32_FROM_PTR (y);
@@ -456,31 +339,6 @@ lowestSetBit (uint64_t * y)
       x = HIGH_U32_FROM_PTR (y);
       result = 32;
     }
-#else
-#if defined(USE_L)
-  if (*y & 0x00000000FFFFFFFFL)
-    {
-      x = LOW_U32_FROM_PTR (y);
-      result = 0;
-    }
-  else
-    {
-      x = HIGH_U32_FROM_PTR (y);
-      result = 32;
-    }
-#else
-  if (*y & 0x00000000FFFFFFFF)
-    {
-      x = LOW_U32_FROM_PTR (y);
-      result = 0;
-    }
-  else
-    {
-      x = HIGH_U32_FROM_PTR (y);
-      result = 32;
-    }
-#endif /* USE_L */
-#endif /* USE_LL */
 
   if (!(x & 0xFFFF))
     {

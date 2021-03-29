@@ -84,17 +84,11 @@ public final class TypeVariableImpl<D extends GenericDeclaration> implements Typ
         if (decl instanceof Class) {
             // FIXME: Is the following hierarchy correct?:
             Class cl = (Class)decl;
-            // RoboVM note: Start of change. Do what the old 4.1.1 code did instead
-            // of AnnotationAccess.getEnclosingMethodOrConstructor(cl) in 4.4.3.
-            decl = cl.getEnclosingMethod();
+            Method m = cl.getEnclosingMethod();
+            decl = (GenericDeclaration) m != null ? m : cl.getEnclosingConstructor();
             if (decl != null) {
                 return decl;
             }
-            decl = cl.getEnclosingConstructor();
-            if (decl != null) {
-                return decl;
-            }
-            // RoboVM note: End of change,
             return cl.getEnclosingClass();
         } else if (decl instanceof Method) {
             return ((Method)decl).getDeclaringClass();

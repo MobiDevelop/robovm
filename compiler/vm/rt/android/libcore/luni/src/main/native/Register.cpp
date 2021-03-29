@@ -16,72 +16,38 @@
 
 #define LOG_TAG "libcore" // We'll be next to "dalvikvm" in the log; make the distinction clear.
 
-#include "cutils/log.h"
-#include "JniConstants.h"
-#include "ScopedLocalFrame.h"
-
 #include <stdlib.h>
 
-// RoboVM note: Macro slightly changed to just define prototypes. All functions return int.
-#define REGISTER(FN) extern int FN(JNIEnv*)
-    REGISTER(register_java_io_Console);
-    REGISTER(register_java_io_File);
-    REGISTER(register_java_io_ObjectStreamClass);
-    REGISTER(register_java_lang_Character);
-    REGISTER(register_java_lang_Double);
-    REGISTER(register_java_lang_Float);
-    REGISTER(register_java_lang_Math);
-    REGISTER(register_java_lang_ProcessManager);
-    REGISTER(register_java_lang_RealToString);
-    REGISTER(register_java_lang_StrictMath);
-    REGISTER(register_java_lang_StringToReal);
-    REGISTER(register_java_lang_System);
-    REGISTER(register_java_math_NativeBN);
-    REGISTER(register_java_nio_ByteOrder);
-    REGISTER(register_java_nio_charset_Charsets);
-    REGISTER(register_java_text_Bidi);
-    REGISTER(register_java_util_regex_Matcher);
-    REGISTER(register_java_util_regex_Pattern);
-    REGISTER(register_java_util_zip_Adler32);
-    REGISTER(register_java_util_zip_CRC32);
-    REGISTER(register_java_util_zip_Deflater);
-    REGISTER(register_java_util_zip_Inflater);
-    REGISTER(register_libcore_icu_AlphabeticIndex);
-    REGISTER(register_libcore_icu_DateIntervalFormat);
-    REGISTER(register_libcore_icu_ICU);
-    REGISTER(register_libcore_icu_NativeBreakIterator);
-    REGISTER(register_libcore_icu_NativeCollation);
-    REGISTER(register_libcore_icu_NativeConverter);
-    REGISTER(register_libcore_icu_NativeDecimalFormat);
-    REGISTER(register_libcore_icu_NativeIDN);
-    REGISTER(register_libcore_icu_NativeNormalizer);
-    REGISTER(register_libcore_icu_NativePluralRules);
-    REGISTER(register_libcore_icu_TimeZoneNames);
-    REGISTER(register_libcore_icu_Transliterator);
-    REGISTER(register_libcore_io_AsynchronousCloseMonitor);
-    REGISTER(register_libcore_io_Memory);
-    REGISTER(register_libcore_io_OsConstants);
-    REGISTER(register_libcore_io_Posix);
-    REGISTER(register_libcore_net_RawSocket);
-    REGISTER(register_org_apache_harmony_dalvik_NativeTestTarget);
-    REGISTER(register_org_apache_harmony_xml_ExpatParser);
-    REGISTER(register_sun_misc_Unsafe);
-#undef REGISTER
+#include <log/log.h>
+#include <nativehelper/JNIHelp.h>
+#include <nativehelper/ScopedLocalFrame.h>
 
-// RoboVM note: rvmInit() calls this on startup, so we can statically register all our native methods.
-extern "C" int registerCoreLibrariesJni(JNIEnv* env) {
+#include "JniConstants.h"
+
+// DalvikVM calls this on startup, so we can statically register all our native methods.
+// RoboVM note: renames as clashes in static RT lib
+extern "C" void luniRegister(JNIEnv* env) {
     ScopedLocalFrame localFrame(env);
 
-    JniConstants::init(env);
+#define REGISTER(FN) extern void FN(JNIEnv*); FN(env)
+    REGISTER(register_android_system_OsConstants);
+    //    REGISTER(register_java_lang_StringToReal);
+    //REGISTER(register_java_lang_invoke_MethodHandle);
+    //REGISTER(register_java_lang_invoke_VarHandle);
+    REGISTER(register_java_math_NativeBN);
+    REGISTER(register_java_util_regex_Matcher);
+    REGISTER(register_java_util_regex_Pattern);
+    REGISTER(register_libcore_icu_ICU);
+    REGISTER(register_libcore_icu_NativeConverter);
+    REGISTER(register_libcore_icu_TimeZoneNames);
+    REGISTER(register_libcore_io_AsynchronousCloseMonitor);
+#if defined(__linux__)
+    REGISTER(register_libcore_io_Linux);
+#endif
+    REGISTER(register_libcore_io_Memory);
+    REGISTER(register_libcore_util_NativeAllocationRegistry);
+    REGISTER(register_org_apache_harmony_xml_ExpatParser);
+#undef REGISTER
 
-    bool result =
-            register_libcore_icu_ICU(env) != -1 &&
-            register_libcore_io_AsynchronousCloseMonitor(env) != -1 &&
-            true;
-
-    if (!result) {
-        ALOGE("Failed to initialize the core libraries; aborting...");
-        abort();
-    }
-    return 0;
+    JniConstants::Initialize(env);
 }

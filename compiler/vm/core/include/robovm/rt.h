@@ -36,6 +36,7 @@ extern const char* rvmRTGetName(void);
  * Initializes the runtime library. Returns TRUE on success.
  */
 extern jboolean rvmRTInit(Env* env);
+extern jboolean rvmRTOnLoad(Env* env);
 
 /**
  * Creates a new java.lang.String instance from the characters at the

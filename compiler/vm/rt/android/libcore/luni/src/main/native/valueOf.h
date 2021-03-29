@@ -17,7 +17,7 @@
 #ifndef VALUE_OF_H_included
 #define VALUE_OF_H_included
 
-#include "JNIHelp.h"
+#include <nativehelper/JNIHelp.h>
 
 jobject booleanValueOf(JNIEnv* env, jboolean b);
 jobject doubleValueOf(JNIEnv* env, jdouble d);

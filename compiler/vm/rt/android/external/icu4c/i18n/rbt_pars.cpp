@@ -1,6 +1,8 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
  **********************************************************************
- *   Copyright (C) 1999-2011, International Business Machines
+ *   Copyright (C) 1999-2016, International Business Machines
  *   Corporation and others.  All Rights Reserved.
  **********************************************************************
  *   Date        Name        Description
@@ -192,9 +194,9 @@ const UnicodeFunctor* ParseData::lookupMatcher(UChar32 ch) const {
     const UnicodeFunctor* set = NULL;
     int32_t i = ch - data->variablesBase;
     if (i >= 0 && i < variablesVector->size()) {
-        int32_t i = ch - data->variablesBase;
-        set = (i < variablesVector->size()) ?
-            (UnicodeFunctor*) variablesVector->elementAt(i) : 0;
+        int32_t j = ch - data->variablesBase;
+        set = (j < variablesVector->size()) ?
+            (UnicodeFunctor*) variablesVector->elementAt(j) : 0;
     }
     return set;
 }
@@ -1102,12 +1104,12 @@ void TransliteratorParser::parseRules(const UnicodeString& rule,
 
             for (int32_t j = 0; j < data->variablesLength; j++) {
                 data->variables[j] =
-                    ((UnicodeSet*)variablesVector.elementAt(j));
+                    static_cast<UnicodeFunctor *>(variablesVector.elementAt(j));
             }
             
             data->variableNames.removeAll();
-            int32_t pos = -1;
-            const UHashElement* he = variableNames.nextElement(pos);
+            int32_t p = UHASH_FIRST;
+            const UHashElement* he = variableNames.nextElement(p);
             while (he != NULL) {
                 UnicodeString* tempus = (UnicodeString*)(((UnicodeString*)(he->value.pointer))->clone());
                 if (tempus == NULL) {
@@ -1116,7 +1118,7 @@ void TransliteratorParser::parseRules(const UnicodeString& rule,
                 }
                 data->variableNames.put(*((UnicodeString*)(he->key.pointer)),
                     tempus, status);
-                he = variableNames.nextElement(pos);
+                he = variableNames.nextElement(p);
             }
         }
         variablesVector.removeAllElements();   // keeps them from getting deleted when we succeed
@@ -1674,11 +1676,18 @@ utrans_stripRules(const UChar *source, int32_t sourceLen, UChar *target, UErrorC
                     target--;
                 }
                 do {
+                    if (source == sourceLimit) {
+                        c = U_SENTINEL;
+                        break;
+                    }
                     c = *(source++);
                 }
                 while (c != CR && c != LF);
+                if (c < 0) {
+                    break;
+                }
             }
-            else if (c == ESCAPE) {
+            else if (c == ESCAPE && source < sourceLimit) {
                 UChar32   c2 = *source;
                 if (c2 == CR || c2 == LF) {
                     /* A backslash at the end of a line. */

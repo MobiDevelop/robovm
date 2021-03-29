@@ -18,15 +18,18 @@
 #ifndef ZIP_UTILITIES_H_included
 #define ZIP_UTILITIES_H_included
 
-#include "UniquePtr.h"
+#include <cstdint>
+#include <memory>
 #include "jni.h"
 #include "zlib.h"
 
 class NativeZipStream {
 public:
-    UniquePtr<jbyte[]> input;
+    std::unique_ptr<jbyte[]> input;
     int inCap;
     z_stream stream;
+    uint64_t totalIn;
+    uint64_t totalOut;
 
     NativeZipStream();
     ~NativeZipStream();
@@ -34,7 +37,7 @@ public:
     void setInput(JNIEnv* env, jbyteArray buf, jint off, jint len);
 
 private:
-    UniquePtr<jbyte[]> mDict;
+    std::unique_ptr<jbyte[]> mDict;
 
     // Disallow copy and assignment.
     NativeZipStream(const NativeZipStream&);

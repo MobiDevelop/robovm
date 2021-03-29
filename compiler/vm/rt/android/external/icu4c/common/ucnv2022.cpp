@@ -1,10 +1,12 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
 /*
 **********************************************************************
-*   Copyright (C) 2000-2012, International Business Machines
+*   Copyright (C) 2000-2016, International Business Machines
 *   Corporation and others.  All Rights Reserved.
 **********************************************************************
 *   file name:  ucnv2022.cpp
-*   encoding:   US-ASCII
+*   encoding:   UTF-8
 *   tab size:   8 (not used)
 *   indentation:4
 *
@@ -43,8 +45,6 @@
 #include "cmemory.h"
 #include "uassert.h"
 
-#define LENGTHOF(array) (int32_t)(sizeof(array)/sizeof((array)[0]))
-
 #ifdef U_ENABLE_GENERIC_ISO_2022
 /*
  * I am disabling the generic ISO-2022 converter after proposing to do so on
@@ -77,8 +77,10 @@
  */
 #endif
 
+#if !UCONFIG_ONLY_HTML_CONVERSION
 static const char SHIFT_IN_STR[]  = "\x0F";
 // static const char SHIFT_OUT_STR[] = "\x0E";
+#endif
 
 #define CR      0x0D
 #define LF      0x0A
@@ -154,7 +156,11 @@ typedef enum  {
 } StateEnum;
 
 /* is the StateEnum charset value for a DBCS charset? */
+#if UCONFIG_ONLY_HTML_CONVERSION
+#define IS_JP_DBCS(cs) (JISX208==(cs))
+#else
 #define IS_JP_DBCS(cs) (JISX208<=(cs) && (cs)<=KSC5601)
+#endif
 
 #define CSM(cs) ((uint16_t)1<<(cs))
 
@@ -167,13 +173,19 @@ typedef enum  {
  *   all versions, not just JIS7 and JIS8.
  * - ICU does not distinguish between different versions of JIS X 0208.
  */
+#if UCONFIG_ONLY_HTML_CONVERSION
+enum { MAX_JA_VERSION=0 };
+#else
 enum { MAX_JA_VERSION=4 };
+#endif
 static const uint16_t jpCharsetMasks[MAX_JA_VERSION+1]={
     CSM(ASCII)|CSM(JISX201)|CSM(JISX208)|CSM(HWKANA_7BIT),
+#if !UCONFIG_ONLY_HTML_CONVERSION
     CSM(ASCII)|CSM(JISX201)|CSM(JISX208)|CSM(HWKANA_7BIT)|CSM(JISX212),
     CSM(ASCII)|CSM(JISX201)|CSM(JISX208)|CSM(HWKANA_7BIT)|CSM(JISX212)|CSM(GB2312)|CSM(KSC5601)|CSM(ISO8859_1)|CSM(ISO8859_7),
     CSM(ASCII)|CSM(JISX201)|CSM(JISX208)|CSM(HWKANA_7BIT)|CSM(JISX212)|CSM(GB2312)|CSM(KSC5601)|CSM(ISO8859_1)|CSM(ISO8859_7),
     CSM(ASCII)|CSM(JISX201)|CSM(JISX208)|CSM(HWKANA_7BIT)|CSM(JISX212)|CSM(GB2312)|CSM(KSC5601)|CSM(ISO8859_1)|CSM(ISO8859_7)
+#endif
 };
 
 typedef enum {
@@ -213,10 +225,10 @@ typedef struct{
 /* ISO-2022 ----------------------------------------------------------------- */
 
 /*Forward declaration */
-U_CFUNC void
+U_CFUNC void U_CALLCONV
 ucnv_fromUnicode_UTF8(UConverterFromUnicodeArgs * args,
                       UErrorCode * err);
-U_CFUNC void
+U_CFUNC void U_CALLCONV
 ucnv_fromUnicode_UTF8_OFFSETS_LOGIC(UConverterFromUnicodeArgs * args,
                                     UErrorCode * err);
 
@@ -360,38 +372,44 @@ static const int8_t escSeqStateTable_Value_2022[MAX_STATES_2022] = {
     ,VALID_TERMINAL_2022        ,VALID_TERMINAL_2022        ,VALID_TERMINAL_2022        ,VALID_TERMINAL_2022
 };
 
-
 /* Type def for refactoring changeState_2022 code*/
 typedef enum{
 #ifdef U_ENABLE_GENERIC_ISO_2022
     ISO_2022=0,
 #endif
     ISO_2022_JP=1,
+#if !UCONFIG_ONLY_HTML_CONVERSION
     ISO_2022_KR=2,
     ISO_2022_CN=3
+#endif
 } Variant2022;
 
 /*********** ISO 2022 Converter Protos ***********/
-static void
+static void U_CALLCONV
 _ISO2022Open(UConverter *cnv, UConverterLoadArgs *pArgs, UErrorCode *errorCode);
 
-static void
+static void U_CALLCONV
  _ISO2022Close(UConverter *converter);
 
-static void
+static void U_CALLCONV
 _ISO2022Reset(UConverter *converter, UConverterResetChoice choice);
 
-static const char*
+U_CDECL_BEGIN
+static const char * U_CALLCONV
 _ISO2022getName(const UConverter* cnv);
+U_CDECL_END
 
-static void
+static void  U_CALLCONV
 _ISO_2022_WriteSub(UConverterFromUnicodeArgs *args, int32_t offsetIndex, UErrorCode *err);
 
-static UConverter *
+U_CDECL_BEGIN
+static UConverter * U_CALLCONV
 _ISO_2022_SafeClone(const UConverter *cnv, void *stackBuffer, int32_t *pBufferSize, UErrorCode *status);
 
+U_CDECL_END
+
 #ifdef U_ENABLE_GENERIC_ISO_2022
-static void
+static void U_CALLCONV
 T_UConverter_toUnicode_ISO_2022_OFFSETS_LOGIC(UConverterToUnicodeArgs* args, UErrorCode* err);
 #endif
 
@@ -399,8 +417,11 @@ namespace {
 
 /*const UConverterSharedData _ISO2022Data;*/
 extern const UConverterSharedData _ISO2022JPData;
+
+#if !UCONFIG_ONLY_HTML_CONVERSION
 extern const UConverterSharedData _ISO2022KRData;
 extern const UConverterSharedData _ISO2022CNData;
+#endif
 
 }  // namespace
 
@@ -454,7 +475,7 @@ setInitialStateFromUnicodeKR(UConverter* converter,UConverterDataISO2022 *myConv
     }
 }
 
-static void
+static void U_CALLCONV
 _ISO2022Open(UConverter *cnv, UConverterLoadArgs *pArgs, UErrorCode *errorCode){
 
     char myLocale[6]={' ',' ',' ',' ',' ',' '};
@@ -476,45 +497,23 @@ _ISO2022Open(UConverter *cnv, UConverterLoadArgs *pArgs, UErrorCode *errorCode){
         }
         version = pArgs->options & UCNV_OPTIONS_VERSION_MASK;
         myConverterData->version = version;
-        /* Begin Google-specific change. */
-        /* The "jk" locale ID was made up for KDDI ISO-2022-JP. */
-        /* The "js" locale ID was made up for SoftBank ISO-2022-JP. */
-        if((myLocale[0]=='j' &&
-            (myLocale[1]=='a'|| myLocale[1]=='p' || myLocale[1]=='k' ||
-             myLocale[1]=='s') &&
-            (myLocale[2]=='_' || myLocale[2]=='\0')))
+        if(myLocale[0]=='j' && (myLocale[1]=='a'|| myLocale[1]=='p') &&
+            (myLocale[2]=='_' || myLocale[2]=='\0'))
         {
-            size_t len=0;
             /* open the required converters and cache them */
             if(version>MAX_JA_VERSION) {
-                /* prevent indexing beyond jpCharsetMasks[] */
-                myConverterData->version = version = 0;
+                // ICU 55 fails to open a converter for an unsupported version.
+                // Previously, it fell back to version 0, but that would yield
+                // unexpected behavior.
+                *errorCode = U_MISSING_RESOURCE_ERROR;
+                return;
             }
             if(jpCharsetMasks[version]&CSM(ISO8859_7)) {
                 myConverterData->myConverterArray[ISO8859_7] =
                     ucnv_loadSharedData("ISO8859_7", &stackPieces, &stackArgs, errorCode);
             }
-            if (myLocale[1]=='k') {  /* Use KDDI's version. */
-                myConverterData->myConverterArray[JISX208] =
-                    ucnv_loadSharedData("kddi-jisx-208-2007", &stackPieces, &stackArgs, errorCode);
-            } else if (myLocale[1]=='s') {  /* Use SoftBank's version. */
-                myConverterData->myConverterArray[JISX208] =
-                    ucnv_loadSharedData("softbank-jisx-208-2007", &stackPieces, &stackArgs, errorCode);
-            } else {
-                /*
-                 * Change for http://b/issue?id=937017 :
-                 * Restore JIS X 0208 ISO-2022-JP mappings from before
-                 * sharing the table with the Shift-JIS converter
-                 * (CL 5963009 and http://bugs.icu-project.org/trac/ticket/5797).
-                 * TODO(mscherer): Create and use a new, unified Google Shift-JIS
-                 * table for both Shift-JIS and ISO-2022-JP.
-                 */
-                myConverterData->myConverterArray[JISX208]  = 
-                    ucnv_loadSharedData("jisx-208", &stackPieces, &stackArgs, errorCode);
-            }
-            /* End Google-specific change. */
-            /* END android-changed */
-
+            myConverterData->myConverterArray[JISX208] =
+                ucnv_loadSharedData("Shift-JIS", &stackPieces, &stackArgs, errorCode);
             if(jpCharsetMasks[version]&CSM(JISX212)) {
                 myConverterData->myConverterArray[JISX212] =
                     ucnv_loadSharedData("jisx-212", &stackPieces, &stackArgs, errorCode);
@@ -535,13 +534,21 @@ _ISO2022Open(UConverter *cnv, UConverterLoadArgs *pArgs, UErrorCode *errorCode){
             uprv_strcpy(myConverterData->locale,"ja");
 
             (void)uprv_strcpy(myConverterData->name,"ISO_2022,locale=ja,version=");
-            len = uprv_strlen(myConverterData->name);
+            size_t len = uprv_strlen(myConverterData->name);
             myConverterData->name[len]=(char)(myConverterData->version+(int)'0');
             myConverterData->name[len+1]='\0';
         }
+#if !UCONFIG_ONLY_HTML_CONVERSION
         else if(myLocale[0]=='k' && (myLocale[1]=='o'|| myLocale[1]=='r') &&
             (myLocale[2]=='_' || myLocale[2]=='\0'))
         {
+            if(version>1) {
+                // ICU 55 fails to open a converter for an unsupported version.
+                // Previously, it fell back to version 0, but that would yield
+                // unexpected behavior.
+                *errorCode = U_MISSING_RESOURCE_ERROR;
+                return;
+            }
             const char *cnvName;
             if(version==1) {
                 cnvName="icu-internal-25546";
@@ -583,6 +590,13 @@ _ISO2022Open(UConverter *cnv, UConverterLoadArgs *pArgs, UErrorCode *errorCode){
         else if(((myLocale[0]=='z' && myLocale[1]=='h') || (myLocale[0]=='c'&& myLocale[1]=='n'))&&
             (myLocale[2]=='_' || myLocale[2]=='\0'))
         {
+            if(version>2) {
+                // ICU 55 fails to open a converter for an unsupported version.
+                // Previously, it fell back to version 0, but that would yield
+                // unexpected behavior.
+                *errorCode = U_MISSING_RESOURCE_ERROR;
+                return;
+            }
 
             /* open the required converters and cache them */
             /* BEGIN android-changed */
@@ -612,6 +626,7 @@ _ISO2022Open(UConverter *cnv, UConverterLoadArgs *pArgs, UErrorCode *errorCode){
                 (void)uprv_strcpy(myConverterData->name,"ISO_2022,locale=zh,version=2");
             }
         }
+#endif  // !UCONFIG_ONLY_HTML_CONVERSION
         else{
 #ifdef U_ENABLE_GENERIC_ISO_2022
             myConverterData->isFirstBuffer = TRUE;
@@ -626,7 +641,9 @@ _ISO2022Open(UConverter *cnv, UConverterLoadArgs *pArgs, UErrorCode *errorCode){
             /* initialize the state variables */
             uprv_strcpy(myConverterData->name,"ISO_2022");
 #else
-            *errorCode = U_UNSUPPORTED_ERROR;
+            *errorCode = U_MISSING_RESOURCE_ERROR;
+            // Was U_UNSUPPORTED_ERROR but changed in ICU 55 to a more standard
+            // data loading error code.
             return;
 #endif
         }
@@ -642,7 +659,7 @@ _ISO2022Open(UConverter *cnv, UConverterLoadArgs *pArgs, UErrorCode *errorCode){
 }
 
 
-static void
+static void U_CALLCONV
 _ISO2022Close(UConverter *converter) {
     UConverterDataISO2022* myData =(UConverterDataISO2022 *) (converter->extraInfo);
     UConverterSharedData **array = myData->myConverterArray;
@@ -665,7 +682,7 @@ _ISO2022Close(UConverter *converter) {
     }
 }
 
-static void
+static void U_CALLCONV
 _ISO2022Reset(UConverter *converter, UConverterResetChoice choice) {
     UConverterDataISO2022 *myConverterData=(UConverterDataISO2022 *) (converter->extraInfo);
     if(choice<=UCNV_RESET_TO_UNICODE) {
@@ -710,7 +727,9 @@ _ISO2022Reset(UConverter *converter, UConverterResetChoice choice) {
     }
 }
 
-static const char*
+U_CDECL_BEGIN
+
+static const char * U_CALLCONV
 _ISO2022getName(const UConverter* cnv){
     if(cnv->extraInfo){
         UConverterDataISO2022* myData= (UConverterDataISO2022*)cnv->extraInfo;
@@ -718,6 +737,8 @@ _ISO2022getName(const UConverter* cnv){
     }
     return NULL;
 }
+
+U_CDECL_END
 
 
 /*************** to unicode *******************/
@@ -746,6 +767,7 @@ static const int8_t nextStateToUnicodeJP[MAX_STATES_2022]= {
     ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE
 };
 
+#if !UCONFIG_ONLY_HTML_CONVERSION
 /*************** to unicode *******************/
 static const int8_t nextStateToUnicodeCN[MAX_STATES_2022]= {
 /*      0                1               2               3               4               5               6               7               8               9    */
@@ -758,6 +780,7 @@ static const int8_t nextStateToUnicodeCN[MAX_STATES_2022]= {
     ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE
     ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE  ,INVALID_STATE
 };
+#endif
 
 
 static UCNV_TableStates_2022
@@ -778,7 +801,7 @@ getKey_2022(char c,int32_t* key,int32_t* offset){
 
     while (hi != low)  /*binary search*/{
 
-        register int32_t mid = (hi+low) >> 1; /*Finds median*/
+        int32_t mid = (hi+low) >> 1; /*Finds median*/
 
         if (mid == oldmid)
             break;
@@ -930,6 +953,7 @@ DONE:
                 }
             }
             break;
+#if !UCONFIG_ONLY_HTML_CONVERSION
         case ISO_2022_CN:
             {
                 StateEnum tempState=(StateEnum)nextStateToUnicodeCN[offset];
@@ -964,9 +988,9 @@ DONE:
                         *err = U_UNSUPPORTED_ESCAPE_SEQUENCE;
                         break;
                     }
-                    /*fall through*/
+                    U_FALLTHROUGH;
                 case GB2312_1:
-                    /*fall through*/
+                    U_FALLTHROUGH;
                 case CNS_11643_1:
                     myData2022->toU2022State.cs[1]=(int8_t)tempState;
                     break;
@@ -991,6 +1015,7 @@ DONE:
                 *err = U_UNSUPPORTED_ESCAPE_SEQUENCE;
             }
             break;
+#endif  // !UCONFIG_ONLY_HTML_CONVERSION
 
         default:
             *err = U_ILLEGAL_ESCAPE_SEQUENCE;
@@ -1033,6 +1058,7 @@ DONE:
     }
 }
 
+#if !UCONFIG_ONLY_HTML_CONVERSION
 /*Checks the characters of the buffer against valid 2022 escape sequences
 *if the match we return a pointer to the initial start of the sequence otherwise
 *we return sourceLimit
@@ -1087,7 +1113,7 @@ getEndOfBuffer_2022(const char** source,
     return mySource;
 #endif
 }
-
+#endif
 
 /* This inline function replicates code in _MBCSFromUChar32() function in ucnvmbcs.c
  * any future change in _MBCSFromUChar32() function should be reflected here.
@@ -1234,7 +1260,7 @@ _2022ToGR94DBCS(uint32_t value) {
 *
 */
 
-static void
+static void U_CALLCONV
 T_UConverter_toUnicode_ISO_2022_OFFSETS_LOGIC(UConverterToUnicodeArgs* args,
                                                            UErrorCode* err){
     const char* mySourceLimit, *realSourceLimit;
@@ -1412,8 +1438,8 @@ static const StateEnum jpCharsetPref[]={
     ASCII,
     JISX201,
     ISO8859_1,
-    ISO8859_7,
     JISX208,
+    ISO8859_7,
     JISX212,
     GB2312,
     KSC5601,
@@ -1640,7 +1666,7 @@ static const uint16_t hwkana_fb[HWKANA_END - HWKANA_START + 1] = {
     0x212C   /* U+FF9F */
 };
 
-static void
+static void U_CALLCONV
 UConverter_fromUnicode_ISO_2022_JP_OFFSETS_LOGIC(UConverterFromUnicodeArgs* args, UErrorCode* err) {
     UConverter *cnv = args->converter;
     UConverterDataISO2022 *converterData;
@@ -1749,7 +1775,7 @@ getTrail:
                 }
 
                 /* try all the other possible charsets */
-                for(i = 0; i < LENGTHOF(jpCharsetPref); ++i) {
+                for(i = 0; i < UPRV_LENGTHOF(jpCharsetPref); ++i) {
                     cs = (int8_t)jpCharsetPref[i];
                     if(CSM(cs) & csm) {
                         choices[choiceCount++] = cs;
@@ -2057,7 +2083,7 @@ getTrail:
 
 /*************** to unicode *******************/
 
-static void
+static void U_CALLCONV
 UConverter_toUnicode_ISO_2022_JP_OFFSETS_LOGIC(UConverterToUnicodeArgs *args,
                                                UErrorCode* err){
     char tempBuf[2];
@@ -2151,7 +2177,6 @@ escape:
             /* ISO-2022-JP does not use single-byte (C1) SS2 and SS3 */
 
             case CR:
-                /*falls through*/
             case LF:
                 /* automatically reset to single-byte mode */
                 if((StateEnum)pToU2022State->cs[0] != ASCII && (StateEnum)pToU2022State->cs[0] != JISX201) {
@@ -2159,7 +2184,7 @@ escape:
                 }
                 pToU2022State->cs[2] = 0;
                 pToU2022State->g = 0;
-                /* falls through */
+                U_FALLTHROUGH;
             default:
                 /* convert one or two bytes */
                 myData->isEmptySegment = FALSE;
@@ -2301,6 +2326,7 @@ endloop:
 }
 
 
+#if !UCONFIG_ONLY_HTML_CONVERSION
 /***************************************************************
 *   Rules for ISO-2022-KR encoding
 *   i) The KSC5601 designator sequence should appear only once in a file,
@@ -2309,7 +2335,7 @@ endloop:
 *  ii) There are only 2 shifting sequences SO to shift into double byte mode
 *      and SI to shift into single byte mode
 */
-static void
+static void U_CALLCONV
 UConverter_fromUnicode_ISO_2022_KR_OFFSETS_LOGIC_IBM(UConverterFromUnicodeArgs* args, UErrorCode* err){
 
     UConverter* saveConv = args->converter;
@@ -2333,7 +2359,7 @@ UConverter_fromUnicode_ISO_2022_KR_OFFSETS_LOGIC_IBM(UConverterFromUnicodeArgs* 
     args->converter=saveConv;
 }
 
-static void
+static void U_CALLCONV
 UConverter_fromUnicode_ISO_2022_KR_OFFSETS_LOGIC(UConverterFromUnicodeArgs* args, UErrorCode* err){
 
     const UChar *source = args->source;
@@ -2552,7 +2578,7 @@ getTrail:
 
 /************************ To Unicode ***************************************/
 
-static void
+static void U_CALLCONV
 UConverter_toUnicode_ISO_2022_KR_OFFSETS_LOGIC_IBM(UConverterToUnicodeArgs *args,
                                                             UErrorCode* err){
     char const* sourceStart;
@@ -2650,7 +2676,7 @@ escape:
     }
 }
 
-static void
+static void U_CALLCONV
 UConverter_toUnicode_ISO_2022_KR_OFFSETS_LOGIC(UConverterToUnicodeArgs *args,
                                                             UErrorCode* err){
     char tempBuf[2];
@@ -2752,7 +2778,7 @@ getTrailByte:
                         /* report a pair of illegal bytes if the second byte is not a DBCS starter */
                         ++mySource;
                         /* add another bit so that the code below writes 2 bytes in case of error */
-                        mySourceChar = 0x10000 | (mySourceChar << 8) | trailByte;
+                        mySourceChar = static_cast<UChar>(0x10000 | (mySourceChar << 8) | trailByte);
                     }
                 } else {
                     args->converter->toUBytes[0] = (uint8_t)mySourceChar;
@@ -2892,7 +2918,7 @@ static const char* const escSeqCharsCN[10] ={
         CNS_11643_1992_Plane_7_STR
 };
 
-static void
+static void U_CALLCONV
 UConverter_fromUnicode_ISO_2022_CN_OFFSETS_LOGIC(UConverterFromUnicodeArgs* args, UErrorCode* err){
     UConverter *cnv = args->converter;
     UConverterDataISO2022 *converterData;
@@ -3243,7 +3269,7 @@ getTrail:
 }
 
 
-static void
+static void U_CALLCONV
 UConverter_toUnicode_ISO_2022_CN_OFFSETS_LOGIC(UConverterToUnicodeArgs *args,
                                                UErrorCode* err){
     char tempBuf[3];
@@ -3284,7 +3310,7 @@ UConverter_toUnicode_ISO_2022_CN_OFFSETS_LOGIC(UConverterToUnicodeArgs *args,
                     myData->isEmptySegment = FALSE;	/* we are handling it, reset to avoid future spurious errors */
                     *err = U_ILLEGAL_ESCAPE_SEQUENCE;
                     args->converter->toUCallbackReason = UCNV_IRREGULAR;
-                    args->converter->toUBytes[0] = mySourceChar;
+                    args->converter->toUBytes[0] = static_cast<uint8_t>(mySourceChar);
                     args->converter->toULength = 1;
                     args->target = myTarget;
                     args->source = mySource;
@@ -3333,10 +3359,9 @@ escape:
             /* ISO-2022-CN does not use single-byte (C1) SS2 and SS3 */
 
             case CR:
-                /*falls through*/
             case LF:
                 uprv_memset(pToU2022State, 0, sizeof(ISO2022State));
-                /* falls through */
+                U_FALLTHROUGH;
             default:
                 /* convert one or two bytes */
                 myData->isEmptySegment = FALSE;
@@ -3444,8 +3469,9 @@ endloop:
     args->target = myTarget;
     args->source = mySource;
 }
+#endif /* #if !UCONFIG_ONLY_HTML_CONVERSION */
 
-static void
+static void U_CALLCONV
 _ISO_2022_WriteSub(UConverterFromUnicodeArgs *args, int32_t offsetIndex, UErrorCode *err) {
     UConverter *cnv = args->converter;
     UConverterDataISO2022 *myConverterData=(UConverterDataISO2022 *) cnv->extraInfo;
@@ -3492,14 +3518,14 @@ _ISO_2022_WriteSub(UConverterFromUnicodeArgs *args, int32_t offsetIndex, UErrorC
     case 'k':
         if(myConverterData->version == 0) {
             if(length == 1) {
-                if((UBool)args->converter->fromUnicodeStatus) {
+                if(args->converter->fromUnicodeStatus) {
                     /* in DBCS mode: switch to SBCS */
                     args->converter->fromUnicodeStatus = 0;
                     *p++ = UCNV_SI;
                 }
                 *p++ = subchar[0];
             } else /* length == 2*/ {
-                if(!(UBool)args->converter->fromUnicodeStatus) {
+                if(!args->converter->fromUnicodeStatus) {
                     /* in SBCS mode: switch to DBCS */
                     args->converter->fromUnicodeStatus = 1;
                     *p++ = UCNV_SO;
@@ -3569,7 +3595,9 @@ struct cloneStruct
 };
 
 
-static UConverter *
+U_CDECL_BEGIN
+
+static UConverter * U_CALLCONV
 _ISO_2022_SafeClone(
             const UConverter *cnv,
             void *stackBuffer,
@@ -3616,7 +3644,9 @@ _ISO_2022_SafeClone(
     return &localClone->cnv;
 }
 
-static void
+U_CDECL_END
+
+static void U_CALLCONV
 _ISO_2022_GetUnicodeSet(const UConverter *cnv,
                     const USetAdder *sa,
                     UConverterUnicodeSet which,
@@ -3670,6 +3700,7 @@ _ISO_2022_GetUnicodeSet(const UConverter *cnv,
             sa->addRange(sa->set, HWKANA_START, HWKANA_END);
         }
         break;
+#if !UCONFIG_ONLY_HTML_CONVERSION
     case 'c':
     case 'z':
         /* include ASCII for CN */
@@ -3681,6 +3712,7 @@ _ISO_2022_GetUnicodeSet(const UConverter *cnv,
                 cnvData->currentConverter, sa, which, pErrorCode);
         /* the loop over myConverterArray[] will simply not find another converter */
         break;
+#endif
     default:
         break;
     }
@@ -3701,9 +3733,15 @@ _ISO_2022_GetUnicodeSet(const UConverter *cnv,
     for (i=0; i<UCNV_2022_MAX_CONVERTERS; i++) {
         UConverterSetFilter filter;
         if(cnvData->myConverterArray[i]!=NULL) {
-            if( (cnvData->locale[0]=='c' || cnvData->locale[0]=='z') &&
-                cnvData->version==0 && i==CNS_11643
-            ) {
+            if(cnvData->locale[0]=='j' && i==JISX208) {
+                /*
+                 * Only add code points that map to Shift-JIS codes
+                 * corresponding to JIS X 0208.
+                 */
+                filter=UCNV_SET_FILTER_SJIS;
+#if !UCONFIG_ONLY_HTML_CONVERSION
+            } else if( (cnvData->locale[0]=='c' || cnvData->locale[0]=='z') &&
+                       cnvData->version==0 && i==CNS_11643) {
                 /*
                  * Version-specific for CN:
                  * CN version 0 does not map CNS planes 3..7 although
@@ -3712,18 +3750,13 @@ _ISO_2022_GetUnicodeSet(const UConverter *cnv,
                  * The two versions create different Unicode sets.
                  */
                 filter=UCNV_SET_FILTER_2022_CN;
-            } else if(cnvData->locale[0]=='j' && i==JISX208) {
-                /*
-                 * Only add code points that map to Shift-JIS codes
-                 * corresponding to JIS X 0208.
-                 */
-                filter=UCNV_SET_FILTER_SJIS;
             } else if(i==KSC5601) {
                 /*
                  * Some of the KSC 5601 tables (convrtrs.txt has this aliases on multiple tables)
                  * are broader than GR94.
                  */
                 filter=UCNV_SET_FILTER_GR94DBCS;
+#endif
             } else {
                 filter=UCNV_SET_FILTER_NONE;
             }
@@ -3792,16 +3825,8 @@ static const UConverterStaticData _ISO2022StaticData={
     0,
     { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } /* reserved */
 };
-const UConverterSharedData _ISO2022Data={
-    sizeof(UConverterSharedData),
-    ~((uint32_t) 0),
-    NULL,
-    NULL,
-    &_ISO2022StaticData,
-    FALSE,
-    &_ISO2022Impl,
-    0, UCNV_MBCS_TABLE_INITIALIZER
-};
+const UConverterSharedData _ISO2022Data=
+        UCNV_IMMUTABLE_SHARED_DATA_INITIALIZER(&_ISO2022StaticData, &_ISO2022Impl);
 
 /*************JP****************/
 static const UConverterImpl _ISO2022JPImpl={
@@ -3848,19 +3873,12 @@ static const UConverterStaticData _ISO2022JPStaticData={
 
 namespace {
 
-const UConverterSharedData _ISO2022JPData={
-    sizeof(UConverterSharedData),
-    ~((uint32_t) 0),
-    NULL,
-    NULL,
-    &_ISO2022JPStaticData,
-    FALSE,
-    &_ISO2022JPImpl,
-    0, UCNV_MBCS_TABLE_INITIALIZER
-};
+const UConverterSharedData _ISO2022JPData=
+        UCNV_IMMUTABLE_SHARED_DATA_INITIALIZER(&_ISO2022JPStaticData, &_ISO2022JPImpl);
 
 }  // namespace
 
+#if !UCONFIG_ONLY_HTML_CONVERSION
 /************* KR ***************/
 static const UConverterImpl _ISO2022KRImpl={
     UCNV_ISO_2022,
@@ -3894,7 +3912,7 @@ static const UConverterStaticData _ISO2022KRStaticData={
     UCNV_IBM,
     UCNV_ISO_2022,
     1,
-    3, /* max 3 bytes per UChar: SO+DBCS */
+    8, /* max 8 bytes per UChar */
     { 0x1a, 0, 0, 0 },
     1,
     FALSE,
@@ -3906,16 +3924,8 @@ static const UConverterStaticData _ISO2022KRStaticData={
 
 namespace {
 
-const UConverterSharedData _ISO2022KRData={
-    sizeof(UConverterSharedData),
-    ~((uint32_t) 0),
-    NULL,
-    NULL,
-    &_ISO2022KRStaticData,
-    FALSE,
-    &_ISO2022KRImpl,
-    0, UCNV_MBCS_TABLE_INITIALIZER
-};
+const UConverterSharedData _ISO2022KRData=
+        UCNV_IMMUTABLE_SHARED_DATA_INITIALIZER(&_ISO2022KRStaticData, &_ISO2022KRImpl);
 
 }  // namespace
 
@@ -3965,17 +3975,10 @@ static const UConverterStaticData _ISO2022CNStaticData={
 
 namespace {
 
-const UConverterSharedData _ISO2022CNData={
-    sizeof(UConverterSharedData),
-    ~((uint32_t) 0),
-    NULL,
-    NULL,
-    &_ISO2022CNStaticData,
-    FALSE,
-    &_ISO2022CNImpl,
-    0, UCNV_MBCS_TABLE_INITIALIZER
-};
+const UConverterSharedData _ISO2022CNData=
+        UCNV_IMMUTABLE_SHARED_DATA_INITIALIZER(&_ISO2022CNStaticData, &_ISO2022CNImpl);
 
 }  // namespace
+#endif /* #if !UCONFIG_ONLY_HTML_CONVERSION */
 
 #endif /* #if !UCONFIG_NO_LEGACY_CONVERSION */

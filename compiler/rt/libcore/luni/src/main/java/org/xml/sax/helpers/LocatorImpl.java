@@ -5,6 +5,7 @@
 
 package org.xml.sax.helpers;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import org.xml.sax.Locator;
 
 
@@ -204,9 +205,13 @@ public class LocatorImpl implements Locator
     // Internal state.
     ////////////////////////////////////////////////////////////////////
 
+    @UnsupportedAppUsage
     private String publicId;
+    @UnsupportedAppUsage
     private String systemId;
+    @UnsupportedAppUsage
     private int lineNumber;
+    @UnsupportedAppUsage
     private int columnNumber;
 
 }

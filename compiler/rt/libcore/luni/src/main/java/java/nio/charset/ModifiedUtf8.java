@@ -1,128 +1,178 @@
 /*
- *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
- *  this work for additional information regarding copyright ownership.
- *  The ASF licenses this file to You under the Apache License, Version 2.0
- *  (the "License"); you may not use this file except in compliance with
- *  the License.  You may obtain a copy of the License at
+ * Copyright (C) 2015 The Android Open Source Project
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License
  */
 
 package java.nio.charset;
 
 import java.io.UTFDataFormatException;
-import java.nio.ByteOrder;
-import libcore.io.Memory;
-import libcore.io.SizeOf;
 
 /**
- * @hide internal use only
+ * Encoding and decoding methods for Modified UTF-8
+ *
+ * <p>Modified UTF-8 is a simple variation of UTF-8 in which {@code \u0000} is encoded as
+ * 0xc0 0x80 . This avoids the presence of bytes 0 in the output.
+ *
+ * @hide
  */
 public class ModifiedUtf8 {
-    /**
-     * Decodes a byte array containing <i>modified UTF-8</i> bytes into a string.
-     *
-     * <p>Note that although this method decodes the (supposedly impossible) zero byte to U+0000,
-     * that's what the RI does too.
-     */
-    public static String decode(byte[] in, char[] out, int offset, int utfSize) throws UTFDataFormatException {
-        int count = 0, s = 0, a;
-        while (count < utfSize) {
-            if ((out[s] = (char) in[offset + count++]) < '\u0080') {
-                s++;
-            } else if (((a = out[s]) & 0xe0) == 0xc0) {
-                if (count >= utfSize) {
-                    throw new UTFDataFormatException("bad second byte at " + count);
-                }
-                int b = in[offset + count++];
-                if ((b & 0xC0) != 0x80) {
-                    throw new UTFDataFormatException("bad second byte at " + (count - 1));
-                }
-                out[s++] = (char) (((a & 0x1F) << 6) | (b & 0x3F));
-            } else if ((a & 0xf0) == 0xe0) {
-                if (count + 1 >= utfSize) {
-                    throw new UTFDataFormatException("bad third byte at " + (count + 1));
-                }
-                int b = in[offset + count++];
-                int c = in[offset + count++];
-                if (((b & 0xC0) != 0x80) || ((c & 0xC0) != 0x80)) {
-                    throw new UTFDataFormatException("bad second or third byte at " + (count - 2));
-                }
-                out[s++] = (char) (((a & 0x0F) << 12) | ((b & 0x3F) << 6) | (c & 0x3F));
-            } else {
-                throw new UTFDataFormatException("bad byte at " + (count - 1));
-            }
-        }
-        return new String(out, 0, s);
-    }
 
     /**
-     * Returns the number of bytes the modified UTF-8 representation of 's' would take. Note
-     * that this is just the space for the bytes representing the characters, not the length
-     * which precedes those bytes, because different callers represent the length differently,
-     * as two, four, or even eight bytes. If {@code shortLength} is true, we'll throw an
-     * exception if the string is too long for its length to be represented by a short.
+     * Count the number of bytes in the modified UTF-8 representation of {@code s}.
+     *
+     * <p>Additionally, if {@code shortLength} is true, throw a {@code UTFDataFormatException} if
+     * the size cannot be presented in an (unsigned) java short.
      */
     public static long countBytes(String s, boolean shortLength) throws UTFDataFormatException {
-        long result = 0;
-        final int length = s.length();
-        for (int i = 0; i < length; ++i) {
-            char ch = s.charAt(i);
-            if (ch != 0 && ch <= 127) { // U+0000 uses two bytes.
-                ++result;
-            } else if (ch <= 2047) {
-                result += 2;
+        long counter = 0;
+        int strLen = s.length();
+        for (int i = 0; i < strLen; i++) {
+            char c = s.charAt(i);
+            if (c < '\u0080') {
+                counter++;
+                if (c == '\u0000') {
+                    counter++;
+                }
+            } else if (c < '\u0800') {
+                counter += 2;
             } else {
-                result += 3;
-            }
-            if (shortLength && result > 65535) {
-                throw new UTFDataFormatException("String more than 65535 UTF bytes long");
+                counter += 3;
             }
         }
-        return result;
+        // Allow up to the maximum value of an unsigned short (as the value is known to be
+        // unsigned.
+        if (shortLength && counter > 0xffff) {
+            throw new UTFDataFormatException(
+                    "Size of the encoded string doesn't fit in two bytes");
+        }
+        return counter;
     }
 
     /**
-     * Encodes the <i>modified UTF-8</i> bytes corresponding to string {@code s} into the
-     * byte array {@code dst}, starting at the given {@code offset}.
+     * Encode {@code s} into {@code dst} starting at offset {@code offset}.
+     *
+     * <p>The output buffer is guaranteed to have enough space.
      */
     public static void encode(byte[] dst, int offset, String s) {
-        final int length = s.length();
-        for (int i = 0; i < length; i++) {
-            char ch = s.charAt(i);
-            if (ch != 0 && ch <= 127) { // U+0000 uses two bytes.
-                dst[offset++] = (byte) ch;
-            } else if (ch <= 2047) {
-                dst[offset++] = (byte) (0xc0 | (0x1f & (ch >> 6)));
-                dst[offset++] = (byte) (0x80 | (0x3f & ch));
+        int strLen = s.length();
+        for (int i = 0; i < strLen; i++) {
+            char c = s.charAt(i);
+            if (c < '\u0080') {
+                if (c == 0) {
+                    dst[offset++] = (byte) 0xc0;
+                    dst[offset++] = (byte) 0x80;
+                } else {
+                    dst[offset++] = (byte) c;
+                }
+            } else if (c < '\u0800') {
+                dst[offset++] = (byte) ((c >>> 6) | 0xc0);
+                dst[offset++] = (byte) ((c & 0x3f) | 0x80);
             } else {
-                dst[offset++] = (byte) (0xe0 | (0x0f & (ch >> 12)));
-                dst[offset++] = (byte) (0x80 | (0x3f & (ch >> 6)));
-                dst[offset++] = (byte) (0x80 | (0x3f & ch));
+                dst[offset++] = (byte) ((c >>> 12) | 0xe0);
+                dst[offset++] = (byte) (((c >>> 6) & 0x3f) | 0x80);
+                dst[offset++] = (byte) ((c & 0x3f) | 0x80);
             }
         }
     }
 
     /**
-     * Returns an array containing the <i>modified UTF-8</i> form of {@code s}, using a
-     * big-endian 16-bit length. Throws UTFDataFormatException if {@code s} is too long
-     * for a two-byte length.
+     * Encodes {@code s} into a buffer with the following format:
+     *
+     * <p>- the first two bytes of the buffer are the length of the modified-utf8 output
+     * (as a big endian short. A UTFDataFormatException is thrown if the encoded size cannot be
+     * represented as a short.
+     *
+     * <p>- the remainder of the buffer contains the modified-utf8 output (equivalent to
+     * {@code encode(buf, 2, s)}).
      */
     public static byte[] encode(String s) throws UTFDataFormatException {
-        int utfCount = (int) ModifiedUtf8.countBytes(s, true);
-        byte[] result = new byte[SizeOf.SHORT + utfCount];
-        Memory.pokeShort(result, 0, (short) utfCount, ByteOrder.BIG_ENDIAN);
-        ModifiedUtf8.encode(result, SizeOf.SHORT, s);
-        return result;
+        long size = countBytes(s, true);
+        byte[] output = new byte[(int) size + 2];
+        encode(output, 2, s);
+        output[0] = (byte) (size >>> 8);
+        output[1] = (byte) size;
+        return output;
     }
 
-    private ModifiedUtf8() {
+    /**
+     * Decodes {@code length} utf-8 bytes from {@code in} starting at offset {@code offset} to
+     * {@code out},
+     *
+     * <p>A maximum of {@code length} chars are written to the output starting at offset 0.
+     * {@code out} is assumed to have enough space for the output (a standard
+     * {@code ArrayIndexOutOfBoundsException} is thrown otherwise).
+     *
+     * <p>If a ‘0’ byte is encountered, it is converted to U+0000.
+     */
+    public static String decode(byte[] in, char[] out, int offset, int length)
+            throws UTFDataFormatException {
+        if (offset < 0 || length < 0) {
+            throw new IllegalArgumentException("Illegal arguments: offset " + offset
+                    + ". Length: " + length);
+        }
+        int outputIndex = 0;
+        int limitIndex = offset + length;
+        while (offset < limitIndex) {
+            int i = in[offset] & 0xff;
+            offset++;
+            if (i < 0x80) {
+                out[outputIndex] = (char) i;
+                outputIndex++;
+                continue;
+            }
+            if (0xc0 <= i && i < 0xe0) {
+                // This branch covers the case 0 = 0xc080.
+
+                // The result is: 5 least-significant bits of i + 6 l-s bits of next input byte.
+                i = (i & 0x1f) << 6;
+                if(offset == limitIndex) {
+                    throw new UTFDataFormatException("unexpected end of input");
+                }
+                // Include 6 least-significant bits of the input byte.
+                if ((in[offset] & 0xc0) != 0x80) {
+                    throw new UTFDataFormatException("bad second byte at " + offset);
+                }
+                out[outputIndex] = (char) (i | (in[offset] & 0x3f));
+                offset++;
+                outputIndex++;
+            } else if(i < 0xf0) {
+                // The result is: 5 least-significant bits of i + 6 l-s bits of next input byte
+                // + 6 l-s of next to next input byte.
+                i = (i & 0x1f) << 12;
+                // Make sure there are are at least two bytes left.
+                if (offset + 1 >= limitIndex) {
+                    throw new UTFDataFormatException("unexpected end of input");
+                }
+                // Include 6 least-significant bits of the input byte, with 6 bits of room
+                // for the next byte.
+                if ((in[offset] & 0xc0) != 0x80) {
+                    throw new UTFDataFormatException("bad second byte at " + offset);
+                }
+                i = i | (in[offset] & 0x3f) << 6;
+                offset++;
+                // Include 6 least-significant bits of the input byte.
+                if ((in[offset] & 0xc0) != 0x80) {
+                    throw new UTFDataFormatException("bad third byte at " + offset);
+                }
+                out[outputIndex] = (char) (i | (in[offset] & 0x3f));
+                offset++;
+                outputIndex++;
+            } else {
+                throw new UTFDataFormatException("Invalid UTF8 byte "
+                        + (int) i + " at position " + (offset - 1));
+            }
+        }
+        return String.valueOf(out, 0, outputIndex);
     }
 }

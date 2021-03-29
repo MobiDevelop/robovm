@@ -37,6 +37,6 @@ class DefaultFileNameMap implements FileNameMap {
         if (firstCharInExtension > filename.lastIndexOf('/')) {
             ext = filename.substring(firstCharInExtension, lastCharInExtension);
         }
-        return MimeUtils.guessMimeTypeFromExtension(ext.toLowerCase(Locale.US));
+        return MimeUtils.guessMimeTypeFromExtension(ext);
     }
 }

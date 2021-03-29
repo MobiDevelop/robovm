@@ -21,12 +21,12 @@
 #define LOG_TAG "core.exception"
 #define THROW_FORMAT_BUF_SIZE 512
 
-static InstanceField* stackStateField = NULL;
+static InstanceField* backtraceField = NULL;
 static Method* printStackTraceMethod = NULL;
 
 jboolean rvmInitExceptions(Env* env) {
-    stackStateField = rvmGetInstanceField(env, java_lang_Throwable, "stackState", "J");
-    if (!stackStateField) return FALSE;
+    backtraceField = rvmGetInstanceField(env, java_lang_Throwable, "backtrace", "J");
+    if (!backtraceField) return FALSE;
     printStackTraceMethod = rvmGetInstanceMethod(env, java_lang_Thread, "printStackTrace", "(Ljava/lang/Throwable;)V");
     if (!printStackTraceMethod) return FALSE;
     return TRUE;
@@ -78,8 +78,8 @@ void rvmThrow(Env* env, Object* e) {
         rvmAbort("rvmThrow() called with env->throwable already set");
     }
     if (IS_TRACE_ENABLED) {
-        jlong stackState = rvmGetLongInstanceFieldValue(env, e, stackStateField);
-        CallStack* callStack = (CallStack*) LONG_TO_PTR(stackState);
+        jlong backtrace = rvmGetLongInstanceFieldValue(env, e, backtraceField);
+        CallStack* callStack = (CallStack*) LONG_TO_PTR(backtrace);
         if (!callStack || callStack->length == 0) {
             TRACEF("Throwing a %s with empty call stack", e->clazz->name);
         } else {

@@ -8,6 +8,8 @@ add_definitions(
   -DDONT_USE_JNI_ONLOAD
 )
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=sign-compare -Wno-unused-parameter")
+
 set(SRC
   src/main/native/sqlite_jni.c
 )

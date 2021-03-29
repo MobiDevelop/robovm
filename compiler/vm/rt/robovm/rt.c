@@ -32,14 +32,17 @@ typedef struct {
   Object* target;
   Object* uncaughtHandler;
 #if defined(RVM_THUMBV7)
-  jlong id __attribute__ ((aligned (8))); // The compiler 8-byte aligns all long fields on ARM 32-bit.
+  jlong stackSize __attribute__ ((aligned (8))); // The compiler 8-byte aligns all long fields on ARM 32-bit.
 #else
-  jlong id;
-#endif
   jlong stackSize;
+#endif
+  jlong threadLocalRandomSeed;
   /*volatile*/ jlong threadPtr; // Points to the Thread
+  jlong tid;
   jint parkState;
   jint priority;
+  jint threadLocalRandomProbe;
+  jint threadLocalRandomSecondarySeed;
   jboolean daemon;
   jboolean started;
 } JavaThread;
@@ -53,8 +56,9 @@ struct ClassLoader {
   ClassLoader* parent;
 };
 
-
-extern int registerCoreLibrariesJni(JNIEnv* env);
+extern void luniRegister(JNIEnv* env);
+extern void ojluniRegister(JNIEnv* env);
+extern void ojluni_OnLoad(JavaVM* vm, void*);
 
 LAZY_CLASS(class_java_lang_String, "java/lang/String");
 LAZY_CLASS(class_java_lang_Thread, "java/lang/Thread");
@@ -120,7 +124,7 @@ jint rvmRTGetThreadStackSize(Env* env, Object* threadObj) {
 }
 
 jlong rvmRTGetThreadId(Env* env, Object* threadObj) {
-    return ((JavaThread*) threadObj)->id;
+    return ((JavaThread*) threadObj)->tid;
 }
 
 void rvmRTResumeJoiningThreads(Env* env, Object* threadObj) {
@@ -140,6 +144,12 @@ const char* rvmRTGetName(void) {
 }
 
 jboolean rvmRTInit(Env* env) {
-    registerCoreLibrariesJni((JNIEnv*) env);
+    luniRegister((JNIEnv*)env);
+    ojluniRegister((JNIEnv*)env);
+    return TRUE;
+}
+
+jboolean rvmRTOnLoad(Env* env) {
+    ojluni_OnLoad(&env->vm->javaVM, NULL);
     return TRUE;
 }

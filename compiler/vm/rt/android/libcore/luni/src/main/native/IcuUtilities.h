@@ -17,15 +17,11 @@
 #ifndef ICU_UTILITIES_H_included
 #define ICU_UTILITIES_H_included
 
-#define U_HAVE_STD_STRING 1 // For UnicodeString::toUTF8String(std::string&).
-
 #include "jni.h"
 #include "ustrenum.h" // For UStringEnumeration.
 #include "unicode/utypes.h" // For UErrorCode.
-#include "unicode/locid.h" // For Locale.
 
-extern Locale getLocale(JNIEnv* env, jstring localeName);
-extern jobjectArray fromStringEnumeration(JNIEnv* env, UErrorCode& status, const char* provider, StringEnumeration*);
+extern jobjectArray fromStringEnumeration(JNIEnv* env, UErrorCode& status, const char* provider, icu::StringEnumeration*);
 bool maybeThrowIcuException(JNIEnv* env, const char* function, UErrorCode error);
 
 #endif  // ICU_UTILITIES_H_included

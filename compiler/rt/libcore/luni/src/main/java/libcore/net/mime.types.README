@@ -1,0 +1,13 @@
+
+Debian is the upstream for this mapping file:
+https://salsa.debian.org/debian/mime-support
+
+Last updated as of commit d4bbcca4ba04582ad1d253d82fc139bb23841a43.
+
+Copyright: public-domain
+License: ad-hoc
+ This package was written by Brian White <bcwhite@pobox.com> and others.
+ It contains public information compiled from around the 'net and many people.
+ .
+ The "update-mime" program was written by Brian White and has been
+ placed in the public domain.

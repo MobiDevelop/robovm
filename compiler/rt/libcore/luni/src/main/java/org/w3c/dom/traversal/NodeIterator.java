@@ -12,6 +12,7 @@
 
 package org.w3c.dom.traversal;
 
+import dalvik.annotation.compat.UnsupportedAppUsage;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Node;
 
@@ -83,6 +84,7 @@ public interface NodeIterator {
      *   INVALID_STATE_ERR: Raised if this method is called after the
      *   <code>detach</code> method was invoked.
      */
+    @UnsupportedAppUsage
     public Node nextNode()
                          throws DOMException;
 
@@ -106,6 +108,7 @@ public interface NodeIterator {
      * or <code>previousNode</code> will raise the exception
      * INVALID_STATE_ERR.
      */
+    @UnsupportedAppUsage
     public void detach();
 
 }

@@ -44,11 +44,9 @@ static Method* java_lang_ref_FinalizerReference_add = NULL;
 static InstanceField* java_lang_ref_FinalizerReference_zombie = NULL;
 static Class* java_lang_ref_ReferenceQueue = NULL;
 static Method* java_lang_ref_ReferenceQueue_add = NULL;
-static InstanceField* java_lang_Throwable_stackState = NULL;
+static InstanceField* java_lang_Throwable_backtrace = NULL;
 static Class* org_robovm_rt_bro_Struct = NULL;
 static InstanceField* org_robovm_rt_bro_Struct_handle = NULL;
-static Class* java_nio_MemoryBlock = NULL;
-static InstanceField* java_nio_MemoryBlock_address = NULL;
 static VM* vm = NULL;
 
 // A shared OutOfMemoryError instance with an empty stack trace that we will use
@@ -172,9 +170,9 @@ static struct GC_ms_entry* markObject(GC_word* addr, struct GC_ms_entry* mark_st
             // point to are also referenced by other roots (the threads list, Class structures)
             // that prevent GCing.
             if (clazz == java_lang_Throwable) {
-                // The 'stackState' field in java.lang.Throwable is a long but contains
+                // The 'backtrace' field in java.lang.Throwable is a long but contains
                 // a pointer to an address on the GCed heap.
-                void** field_start = (void**) (((char*) obj) + java_lang_Throwable_stackState->offset);
+                void** field_start = (void**) (((char*) obj) + java_lang_Throwable_backtrace->offset);
                 void** field_end = (void**) (((char*) field_start) + sizeof(jlong));
                 mark_stack_ptr = markRegion(field_start, field_end, mark_stack_ptr, mark_stack_limit);
             } else if (clazz == org_robovm_rt_bro_Struct) {
@@ -182,12 +180,6 @@ static struct GC_ms_entry* markObject(GC_word* addr, struct GC_ms_entry* mark_st
                 // superclass NativeObject) is a long but contains a pointer.
                 // Possibly to an address on the GCed heap.
                 void** field_start = (void**) (((char*) obj) + org_robovm_rt_bro_Struct_handle->offset);
-                void** field_end = (void**) (((char*) field_start) + sizeof(jlong));
-                mark_stack_ptr = markRegion(field_start, field_end, mark_stack_ptr, mark_stack_limit);
-            } else if (clazz == java_nio_MemoryBlock) {
-                // The 'address' field in java.nio.MemoryBlock is a long but contains a pointer.
-                // Possibly to an address on the GCed heap.
-                void** field_start = (void**) (((char*) obj) + java_nio_MemoryBlock_address->offset);
                 void** field_end = (void**) (((char*) field_start) + sizeof(jlong));
                 mark_stack_ptr = markRegion(field_start, field_end, mark_stack_ptr, mark_stack_limit);
             }
@@ -896,12 +888,12 @@ jboolean rvmInitMemory(Env* env) {
     if (!java_nio_DirectByteBuffer_init) return FALSE;
     Class* java_nio_Buffer = rvmFindClassUsingLoader(env, "java/nio/Buffer", NULL);
     if (!java_nio_Buffer) return FALSE;
-    java_nio_Buffer_effectiveDirectAddress = rvmGetInstanceField(env, java_nio_Buffer, "effectiveDirectAddress", "J");
+    java_nio_Buffer_effectiveDirectAddress = rvmGetInstanceField(env, java_nio_Buffer, "address", "J");
     if (!java_nio_Buffer_effectiveDirectAddress) return FALSE;
     java_nio_Buffer_capacity = rvmGetInstanceField(env, java_nio_Buffer, "capacity", "I");
     if (!java_nio_Buffer_capacity) return FALSE;
-    java_lang_Throwable_stackState = rvmGetInstanceField(env, java_lang_Throwable, "stackState", "J");
-    if (!java_lang_Throwable_stackState) return FALSE;
+    java_lang_Throwable_backtrace = rvmGetInstanceField(env, java_lang_Throwable, "backtrace", "J");
+    if (!java_lang_Throwable_backtrace) return FALSE;
     org_robovm_rt_bro_Struct = rvmFindClassUsingLoader(env, "org/robovm/rt/bro/Struct", NULL);
     if (!org_robovm_rt_bro_Struct) {
         // We don't need Struct if it hasn't been compiled in
@@ -910,10 +902,6 @@ jboolean rvmInitMemory(Env* env) {
         org_robovm_rt_bro_Struct_handle = rvmGetInstanceField(env, org_robovm_rt_bro_Struct, "handle", "J");
         if (!org_robovm_rt_bro_Struct_handle) return FALSE;
     }
-    java_nio_MemoryBlock = rvmFindClassUsingLoader(env, "java/nio/MemoryBlock", NULL);
-    if (!java_nio_MemoryBlock) return FALSE;
-    java_nio_MemoryBlock_address = rvmGetInstanceField(env, java_nio_MemoryBlock, "address", "J");
-    if (!java_nio_MemoryBlock_address) return FALSE;
 
     criticalOutOfMemoryError = rvmAllocateMemoryForObject(env, java_lang_OutOfMemoryError);
     if (!criticalOutOfMemoryError) return FALSE;
@@ -952,8 +940,7 @@ void rvmSetupGcDescriptor(Env* env, Class* clazz) {
         clazz->gcDescriptor = REF_FREE_GC_DESCRIPTOR;
     } else if (clazz == java_lang_Class || CLASS_IS_FINALIZABLE(clazz) || CLASS_IS_REFERENCE(clazz) 
         || (clazz->superclass && clazz->superclass == org_robovm_rt_bro_Struct)
-        || (clazz->superclass && clazz->superclass == java_nio_MemoryBlock)
-        || (clazz == java_nio_MemoryBlock) || rvmIsSubClass(java_lang_Throwable, clazz)) {
+        || rvmIsSubClass(java_lang_Throwable, clazz)) {
 
         // These types of objects must be marked specially. We could probably
         // do this using GC bitmap descriptors instead.

@@ -14,43 +14,18 @@
  * limitations under the License.
  */
 
+#include <nativehelper/toStringArray.h>
+
 #include "JniConstants.h"
-#include "toStringArray.h"
 
-#include <string>
-#include <vector>
-
-jobjectArray newStringArray(JNIEnv* env, size_t count) {
-    return env->NewObjectArray(count, JniConstants::stringClass, NULL);
-}
-
-struct VectorCounter {
-    const std::vector<std::string>& strings;
-    VectorCounter(const std::vector<std::string>& strings) : strings(strings) {}
-    size_t operator()() {
-        return strings.size();
-    }
-};
-struct VectorGetter {
-    const std::vector<std::string>& strings;
-    VectorGetter(const std::vector<std::string>& strings) : strings(strings) {}
-    const char* operator()(size_t i) {
-        return strings[i].c_str();
-    }
-};
-
-jobjectArray toStringArray(JNIEnv* env, const std::vector<std::string>& strings) {
-    VectorCounter counter(strings);
-    VectorGetter getter(strings);
-    return toStringArray<VectorCounter, VectorGetter>(env, &counter, &getter);
-}
+namespace {
 
 struct ArrayCounter {
     const char* const* strings;
-    ArrayCounter(const char* const* strings) : strings(strings) {}
+    explicit ArrayCounter(const char* const* strings) : strings(strings) {}
     size_t operator()() {
         size_t count = 0;
-        while (strings[count] != NULL) {
+        while (strings[count] != nullptr) {
             ++count;
         }
         return count;
@@ -59,13 +34,19 @@ struct ArrayCounter {
 
 struct ArrayGetter {
     const char* const* strings;
-    ArrayGetter(const char* const* strings) : strings(strings) {}
+    explicit ArrayGetter(const char* const* strings) : strings(strings) {}
     const char* operator()(size_t i) {
         return strings[i];
     }
 };
 
-jobjectArray toStringArray(JNIEnv* env, const char* const* strings) {
+}  // namespace
+
+MODULE_API jobjectArray newStringArray(JNIEnv* env, size_t count) {
+    return env->NewObjectArray(count, JniConstants::GetStringClass(env), nullptr);
+}
+
+MODULE_API jobjectArray toStringArray(JNIEnv* env, const char* const* strings) {
     ArrayCounter counter(strings);
     ArrayGetter getter(strings);
     return toStringArray(env, &counter, &getter);
