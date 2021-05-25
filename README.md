@@ -33,3 +33,6 @@ For using the RoboVM Gradle plugin, follow the [README in the repository](https:
 ## License
 See the LICENSE files in the various sub directories. Generally, RoboVM is GPL2,
 with the runtime code being Apache 2 for distribution on iOS.
+
+[Open list of apps and games built with LibGDX/RoboVM](https://github.com/vminc/made-with-robovm-libgdx)
+
