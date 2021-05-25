@@ -137,12 +137,30 @@ jint Java_java_net_NetworkInterface_getInterfaceIndex(Env* env, Class* cls, Obje
     return if_nametoindex(name);
 }
 
+#if defined(DARWIN)
+static jboolean getFlagsIterator(Env* env, struct ifaddrs *ia, void* data) {
+    unsigned int* resultPtr = (unsigned int*) data;
+    *resultPtr = ia->ifa_flags;
+    return FALSE; // Stop iteration
+ }
+#endif
 jint Java_java_net_NetworkInterface_getFlags(Env* env, Class* cls, Object* interfaceName) {
+    unsigned int flags = 0;
+#if defined(DARWIN)
+    const char* name = rvmGetStringUTFChars(env, interfaceName);
+    if (!name) {
+        return 0;
+    }
+    // Darwin doesn't support getting flags through ioctl so we need to use getifaddrs() instead.
+    iterateAddrInfo(env, name, getFlagsIterator, &flags);
+#else
     struct ifreq ifreq;
     if (!ioctl_ifreq(env, interfaceName, &ifreq, SIOCGIFFLAGS)) {
         return 0;
     }
-    return ((jint) ifreq.ifr_flags) & 0xffff;
+    flags = ifreq.ifr_flags;
+#endif
+    return ((jint) flags) & 0xffff;
 }
 
 jint Java_java_net_NetworkInterface_getMTU(Env* env, Class* cls, Object* interfaceName) {
