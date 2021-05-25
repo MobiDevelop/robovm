@@ -40,6 +40,7 @@ import org.robovm.compiler.plugin.TargetPlugin;
 import org.robovm.compiler.plugin.annotation.AnnotationImplPlugin;
 import org.robovm.compiler.plugin.debug.DebugInformationPlugin;
 import org.robovm.compiler.plugin.debug.DebuggerLaunchPlugin;
+import org.robovm.compiler.plugin.desugar.StringConcatRewriterPlugin;
 import org.robovm.compiler.plugin.lambda.LambdaPlugin;
 import org.robovm.compiler.plugin.objc.InterfaceBuilderClassesPlugin;
 import org.robovm.compiler.plugin.objc.ObjCBlockPlugin;
@@ -251,6 +252,7 @@ public class Config {
                 new ObjCMemberPlugin(),
                 new ObjCBlockPlugin(),
                 new AnnotationImplPlugin(),
+                new StringConcatRewriterPlugin(),
                 new LambdaPlugin(),         
                 new DebugInformationPlugin(),
                 new DebuggerLaunchPlugin()
