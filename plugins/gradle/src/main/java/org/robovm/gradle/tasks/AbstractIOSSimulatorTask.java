@@ -17,6 +17,7 @@ package org.robovm.gradle.tasks;
 
 import org.robovm.compiler.config.Arch;
 import org.robovm.compiler.config.OS;
+import org.robovm.compiler.target.ios.DeviceType;
 import org.robovm.compiler.target.ios.IOSTarget;
 
 /**
@@ -36,9 +37,15 @@ public abstract class AbstractIOSSimulatorTask extends AbstractSimulatorTask {
     
     @Override
     protected Arch getArch() {
-        Arch arch = Arch.x86_64;
-        if (extension.getArch() != null && extension.getArch().equals(Arch.x86.toString())) {
-            arch = Arch.x86;
+        Arch arch = DeviceType.DEFAULT_HOST_ARCH;
+        String extArchName = extension.getArch();
+        if (extArchName != null) {
+            if (extArchName.equals(Arch.x86_64.toString()))
+                arch = Arch.x86_64;
+            else if (extArchName.equals(Arch.arm64.toString()))
+                arch = Arch.arm64;
+            else if (extArchName.equals(Arch.x86.toString()))
+                arch = Arch.x86;
         }
         return arch;
     }

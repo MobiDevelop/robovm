@@ -24,12 +24,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.robovm.compiler.clazz.*;
-import org.robovm.compiler.config.Arch;
-import org.robovm.compiler.config.Config;
+import org.robovm.compiler.config.*;
 import org.robovm.compiler.config.Config.TreeShakerMode;
-import org.robovm.compiler.config.ForceLinkMethodsConfig;
-import org.robovm.compiler.config.OS;
-import org.robovm.compiler.config.Resource;
 import org.robovm.compiler.config.StripArchivesConfig.StripArchivesBuilder;
 import org.robovm.compiler.log.ConsoleLogger;
 import org.robovm.compiler.plugin.LaunchPlugin;
@@ -753,14 +749,15 @@ public class AppCompiler {
                     if (!"auto".equals(s)) {
                         archs.add(Arch.valueOf(s));
                     }
+                } else if ("-env".equals(args[i])) {
+                    String s = args[++i];
+                    builder.env(Environment.valueOf(s));
                 } else if ("-archs".equals(args[i])) {
                     for (String s : args[++i].split(":")) {
                         if (!"auto".equals(s)) {
                             archs.add(Arch.valueOf(s));
                         }
                     }
-//                } else if ("-cpu".equals(args[i])) {
-//                    builder.cpu(args[++i]);
                 } else if ("-target".equals(args[i])) {
                     String s = args[++i];
                     builder.targetType("auto".equals(s) ? null : s);
@@ -1107,9 +1104,9 @@ public class AppCompiler {
         System.err.println("  -archs <list>         : separated list of archs. Used to build a fat binary which\n" 
                          + "                        includes all the specified archs. Allowed values\n" 
                          + "                        are 'x86', 'x86_64', 'thumbv7', 'arm64'.");
-        System.err.println("  -cpu <name>           The name of the LLVM cpu to compile for. The LLVM default\n" 
-                         + "                        is used if not specified. Use llc to determine allowed values.");
-        System.err.println("  -target <name>        The target to build for. One of:\n" 
+        System.err.println("  -env <name>           The name platform environment. Allowed values\n"
+                         + "                        are 'Native', 'Simulator'. Default is 'Native'");
+        System.err.println("  -target <name>        The target to build for. One of:\n"
                          + "                          'auto', '" + StringUtils.join(targets, "', '") + "'\n" 
                          + "                        The default is 'auto' which means use -os to decide.");
         System.err.println("  -forcelinkclasses <list>\n" 

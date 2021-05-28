@@ -7,9 +7,8 @@ import org.apache.commons.io.FileUtils;
 import org.robovm.compiler.clazz.Path;
 import org.robovm.compiler.config.Arch;
 import org.robovm.compiler.config.Config;
+import org.robovm.compiler.config.Environment;
 import org.robovm.compiler.config.OS;
-import org.robovm.compiler.log.Logger;
-import org.robovm.compiler.log.LoggerProxy;
 import org.robovm.compiler.target.AbstractTarget;
 import org.robovm.compiler.target.ios.SDK;
 import org.robovm.compiler.util.Executor;
@@ -21,12 +20,16 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.robovm.compiler.target.ios.IOSTarget.isDeviceArch;
+import static org.robovm.compiler.target.ios.IOSTarget.isSimulatorArch;
+
 public class FrameworkTarget extends AbstractTarget {
 
 	public static final String TYPE = "framework";
 
     private OS os;
     private Arch arch;
+    private Environment env;
     private SDK sdk;
 
     public FrameworkTarget() {
@@ -47,22 +50,18 @@ public class FrameworkTarget extends AbstractTarget {
 		return arch;
 	}
 
+	@Override
+	public Environment getEnv() {
+		return env;
+	}
+
     @Override
 	public boolean canLaunch() {
 		return false;
 	}
 
-	public static boolean isSimulatorArch(Arch arch) {
-        return arch == Arch.x86 || arch == Arch.x86_64;
-    }
-
-    public static boolean isDeviceArch(Arch arch) {
-        return arch == Arch.thumbv7 || arch == Arch.arm64;
-    }
-
-
     public List<SDK> getSDKs() {
-        if (isSimulatorArch(arch)) {
+        if (isSimulatorArch(arch, env)) {
             return SDK.listSimulatorSDKs();
         } else {
             return SDK.listDeviceSDKs();
@@ -80,6 +79,8 @@ public class FrameworkTarget extends AbstractTarget {
         if (arch == null)
             arch = Arch.getDefaultArch();
 
+		env = config.getEnv();
+
 		if (os.getFamily() != OS.Family.darwin)
 			throw new IllegalArgumentException("Frameworks can only be built for Darwin platforms");
 		
@@ -92,7 +93,7 @@ public class FrameworkTarget extends AbstractTarget {
 		List<SDK> sdks = getSDKs();
         if (sdkVersion == null) {
             if (sdks.isEmpty()) {
-                throw new IllegalArgumentException("No " + (isDeviceArch(arch) ? "device" : "simulator")
+                throw new IllegalArgumentException("No " + (isDeviceArch(arch, env) ? "device" : "simulator")
                         + " SDKs installed");
             }
             Collections.sort(sdks);
@@ -133,17 +134,14 @@ public class FrameworkTarget extends AbstractTarget {
 		List<String> ccArgs = new ArrayList<String>();
 		
 		ccArgs.add("-stdlib=libc++");
-		
-		if (isDeviceArch(arch)) {
-			ccArgs.add("-miphoneos-version-min=" + getMinimumOSVersion());
-			if (config.isEnableBitcode()) {
-				// tells clang to keep bitcode while linking
-				ccArgs.add("-fembed-bitcode");
-			}
-		} else {
-			ccArgs.add("-mios-simulator-version-min=" + getMinimumOSVersion());
+
+		ccArgs.add("--target=" + config.getClangTriple(getMinimumOSVersion()));
+
+		if (isDeviceArch(arch, env) && config.isEnableBitcode()) {
+			// tells clang to keep bitcode while linking
+			ccArgs.add("-fembed-bitcode");
 		}
-		
+
 		ccArgs.add("-isysroot");
 		ccArgs.add(sdk.getRoot().getAbsolutePath());
 		

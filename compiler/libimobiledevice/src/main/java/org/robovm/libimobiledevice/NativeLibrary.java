@@ -46,6 +46,8 @@ public class NativeLibrary {
         }
         if (archProp.matches("amd64|x86[-_]64")) {
             arch = "x86_64";
+        } else if (archProp.matches("aarch64|arm64")) {
+            arch = "arm64";
         } else {
             arch = null;
         }

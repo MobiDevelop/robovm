@@ -17,14 +17,9 @@
  */
 package org.robovm.idea.compilation;
 
-import com.intellij.execution.configurations.ModuleRunProfile;
-import com.intellij.execution.configurations.RunConfiguration;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.compiler.CompileContext;
 import com.intellij.openapi.compiler.CompileScope;
-import com.intellij.openapi.compiler.CompileTask;
 import com.intellij.openapi.compiler.CompilerManager;
-import com.intellij.openapi.compiler.CompilerMessageCategory;
 import com.intellij.openapi.compiler.CompilerPaths;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
@@ -41,6 +36,7 @@ import org.jetbrains.annotations.NotNull;
 import org.robovm.compiler.AppCompiler;
 import org.robovm.compiler.config.Arch;
 import org.robovm.compiler.config.Config;
+import org.robovm.compiler.config.Environment;
 import org.robovm.compiler.config.OS;
 import org.robovm.compiler.plugin.PluginArgument;
 import org.robovm.compiler.target.ConsoleTarget;
@@ -212,18 +208,21 @@ public class RoboVmCompileTask {
             // set OS and arch
             OS os;
             Arch arch;
+            Environment env = Environment.Native;
             if (runConfig.getTargetType() == RoboVmRunConfiguration.TargetType.Device) {
                 os = OS.ios;
                 arch = runConfig.getDeviceArch();
             } else if (runConfig.getTargetType() == RoboVmRunConfiguration.TargetType.Simulator) {
                 os = OS.ios;
                 arch = runConfig.getSimulatorArch();
+                env = Environment.Simulator;
             } else {
                 os = OS.getDefaultOS();
-                arch = Arch.getDefaultArch();
+                arch = runConfig.getDeviceArch();;
             }
             builder.os(os);
             builder.arch(arch);
+            builder.env(env);
 
             // set the plugin args
             List<String> args = splitArgs(runConfig.getArguments());
@@ -232,7 +231,7 @@ public class RoboVmCompileTask {
             // set build dir and install dir, pattern
             // module-basedir/robovm-build/tmp/module-name/runconfig-name/os/arch.
             // module-basedir/robovm-build/app/module-name/runconfig-name/os/arch.
-            File buildDir = RoboVmPlugin.getModuleBuildDir(module, runConfig.getName(), os, arch);
+            File buildDir = RoboVmPlugin.getModuleBuildDir(module, runConfig.getName(), os, arch, env);
             builder.tmpDir(buildDir);
             builder.skipInstall(true);
             RoboVmPlugin.logInfo(project, "Building executable in %s", buildDir.getAbsolutePath());

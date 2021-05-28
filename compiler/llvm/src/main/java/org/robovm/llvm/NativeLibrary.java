@@ -55,6 +55,8 @@ public class NativeLibrary {
             arch = "x86_64";
         } else if (archProp.matches("i386|x86")) {
             arch = "x86";
+        } else if (archProp.matches("aarch64|arm64")) {
+            arch = "arm64";
         } else {
             throw new Error("Unsupported arch: " + System.getProperty("os.arch"));
         }

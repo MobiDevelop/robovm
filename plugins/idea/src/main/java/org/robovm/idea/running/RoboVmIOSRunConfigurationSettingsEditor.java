@@ -40,7 +40,7 @@ import static org.robovm.idea.running.RoboVmRunConfiguration.AUTO_SIGNING_IDENTI
 
 public class RoboVmIOSRunConfigurationSettingsEditor extends SettingsEditor<RoboVmRunConfiguration> {
     private static final Arch[] DEVICE_ARCHS = {Arch.arm64, Arch.thumbv7};
-    private static final Arch[] SIMULATOR_ARCHS = {Arch.x86_64, Arch.x86};
+    private static final Arch[] SIMULATOR_ARCHS = {Arch.x86_64, Arch.x86, Arch.arm64};
 
     public static final String AUTO_SIMULATOR_IPHONE_TITLE = "Auto (prefers '" + DeviceType.PREFERRED_IPHONE_SIM_NAME + "')";
     public static final String AUTO_SIMULATOR_IPAD_TITLE = "Auto (prefers '" + DeviceType.PREFERRED_IPAD_SIM_NAME + "')";
@@ -154,9 +154,9 @@ public class RoboVmIOSRunConfigurationSettingsEditor extends SettingsEditor<Robo
         simArch.removeAllItems();
         if (simulator != null) {
             if (simulator == simulatorAutoIPad || simulator == simulatorAutoIPhone){
-                // auto simulator, only x86_64 is allowed, if arch doesn't match -- override
-                simArch.addItem(Arch.x86_64);
-                result = Arch.x86_64;
+                // auto simulator, use default OS arch (x86_64 or arm64 on m1)is allowed, if arch doesn't match -- override
+                simArch.addItem(DeviceType.DEFAULT_HOST_ARCH);
+                result = DeviceType.DEFAULT_HOST_ARCH;
             } else {
                 Set<Arch> simArches = simulator.data.getArchs();
                 for (Arch a : SIMULATOR_ARCHS) {

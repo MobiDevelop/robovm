@@ -5,6 +5,8 @@
 /libimobiledevice/target/
 /libimobiledevice/target-libimobiledevice/
 /llvm/target/
+/llvm/target.llvm/
+/libhfscompressor/target-libhfscompressor/
 /objc/target/
 /rt/target/
 /vm/target/

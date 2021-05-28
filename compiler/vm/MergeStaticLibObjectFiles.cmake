@@ -38,8 +38,8 @@ function(merge_static_lib_object_files lib)
       string(REPLACE ";" " " exported_symbols_args_joined "${exported_symbols_args}")
       add_custom_command(TARGET ${lib}
         COMMAND echo Merging object files in $<TARGET_FILE:${lib}> with exported symbols: ${exported_symbols_joined}
-        COMMAND echo ld -arch ${CARCH} -r ${exported_symbols_args_joined} -all_load $<TARGET_FILE:${lib}> -o ${CMAKE_CURRENT_BINARY_DIR}/merged.o
-        COMMAND ld -arch ${CARCH} -r ${exported_symbols_args} -all_load $<TARGET_FILE:${lib}> -o ${CMAKE_CURRENT_BINARY_DIR}/merged.o
+        COMMAND echo ld -arch ${CARCH} -platform_version ${CPLATFORM} ${CPLATFORM_MIN_VERSION} ${CPLATFORM_MIN_VERSION} -r ${exported_symbols_args} -all_load $<TARGET_FILE:${lib}> -o ${CMAKE_CURRENT_BINARY_DIR}/merged.o
+        COMMAND ld -arch ${CARCH} -platform_version ${CPLATFORM} ${CPLATFORM_MIN_VERSION} ${CPLATFORM_MIN_VERSION} -r ${exported_symbols_args} -all_load $<TARGET_FILE:${lib}> -o ${CMAKE_CURRENT_BINARY_DIR}/merged.o
         COMMAND rm -f $<TARGET_FILE:${lib}>
         COMMAND ar rcs $<TARGET_FILE:${lib}> ${CMAKE_CURRENT_BINARY_DIR}/merged.o
       )

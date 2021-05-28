@@ -38,7 +38,7 @@ public class VectorStructureType extends StructureType {
 
     /**
      * @return true if vector consists of another vector structs (not primitives)\
-     * and will be translated into stuct of array of primitive vector
+     * and will be translated into struct of array of primitive vector
      * example is MatrixFloat2x2
      */
     public boolean isVectorArray() {

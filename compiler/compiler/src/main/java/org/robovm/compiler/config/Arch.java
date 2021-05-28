@@ -87,6 +87,10 @@ public enum Arch {
         if (hostTriple.matches("^(x86|i\\d86).*")) {
             return Arch.x86;
         }
+        if (hostTriple.matches("^(arm-apple-darwin).*")) {
+            // MacOSX m1 CPU
+            return Arch.arm64;
+        }
         throw new CompilerException("Unrecognized arch in host triple: " + hostTriple);
     }    
 }

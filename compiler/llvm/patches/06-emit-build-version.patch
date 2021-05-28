@@ -1,0 +1,1065 @@
+diff --git a/include/llvm/ADT/Triple.h b/include/llvm/ADT/Triple.h
+index 0932040ede7..3f23c891c6f 100644
+--- a/include/llvm/ADT/Triple.h
++++ b/include/llvm/ADT/Triple.h
+@@ -96,6 +96,8 @@ public:
+     ARMSubArch_v5te,
+     ARMSubArch_v4t,
+ 
++    AArch64SubArch_arm64e,
++
+     KalimbaSubArch_v3,
+     KalimbaSubArch_v4,
+     KalimbaSubArch_v5
+@@ -139,7 +141,9 @@ public:
+     AIX,
+     CUDA,       // NVIDIA CUDA
+     NVCL,       // NVIDIA OpenCL
+-    AMDHSA      // AMD HSA Runtime
++    AMDHSA,     // AMD HSA Runtime
++    TvOS,       // Apple tvOS
++    WatchOS     // Apple watchOS
+   };
+   enum EnvironmentType {
+     UnknownEnvironment,
+@@ -156,7 +160,9 @@ public:
+     MSVC,
+     Itanium,
+     Cygnus,
+-  };
++    Simulator, // Simulator variants of other systems, e.g., Apple's iOS
++    MacABI     // Mac Catalyst variant of Apple's iOS deployment target.
++};
+   enum ObjectFormatType {
+     UnknownObjectFormat,
+ 
+@@ -245,6 +251,13 @@ public:
+   /// If an entry is not defined, it will be returned as 0.
+   void getOSVersion(unsigned &Major, unsigned &Minor, unsigned &Micro) const;
+ 
++  /// Some platforms have different minimum supported OS versions that
++  /// varies by the architecture specified in the triple. This function
++  /// returns the minimum supported OS version for this triple if one an exists,
++  /// or an invalid version tuple if this triple doesn't have one.
++  void getMinimumSupportedOSVersion(unsigned &Major, unsigned &Minor,
++                                    unsigned &Micro) const;
++
+   /// getOSMajorVersion - Return just the major version number, this is
+   /// specialized because it is a common query.
+   unsigned getOSMajorVersion() const {
+@@ -265,6 +278,11 @@ public:
+   void getiOSVersion(unsigned &Major, unsigned &Minor,
+                      unsigned &Micro) const;
+ 
++  /// getWatchOSVersion - Parse the version number as with getOSVersion.  This
++  /// should only be called with WatchOS or generic triples.
++  void getWatchOSVersion(unsigned &Major, unsigned &Minor,
++                         unsigned &Micro) const;
++
+   /// @}
+   /// @name Direct Component Access
+   /// @{
+@@ -365,6 +383,20 @@ public:
+     return isMacOSX() || isiOS();
+   }
+ 
++  bool isSimulatorEnvironment() const {
++    return getEnvironment() == Triple::Simulator;
++  }
++
++  bool isMacCatalystEnvironment() const {
++    return getEnvironment() == Triple::MacABI;
++  }
++
++  /// Tests whether the target is the Apple "arm64e" AArch64 subarch.
++  bool isArm64e() const {
++    return getArch() == Triple::aarch64 &&
++           getSubArch() == Triple::AArch64SubArch_arm64e;
++  }
++
+   bool isOSNetBSD() const {
+     return getOS() == Triple::NetBSD;
+   }
+diff --git a/include/llvm/CodeGen/MachineModuleInfo.h b/include/llvm/CodeGen/MachineModuleInfo.h
+index 287b3ebb0e2..47d33a03153 100644
+--- a/include/llvm/CodeGen/MachineModuleInfo.h
++++ b/include/llvm/CodeGen/MachineModuleInfo.h
+@@ -178,7 +178,7 @@ public:
+ 
+   MachineModuleInfo();  // DUMMY CONSTRUCTOR, DO NOT CALL.
+   // Real constructor.
+-  MachineModuleInfo(const MCAsmInfo &MAI, const MCRegisterInfo &MRI,
++  MachineModuleInfo(const Triple &TheTriple, const MCAsmInfo &MAI, const MCRegisterInfo &MRI,
+                     const MCObjectFileInfo *MOFI);
+   ~MachineModuleInfo();
+ 
+diff --git a/include/llvm/MC/MCAssembler.h b/include/llvm/MC/MCAssembler.h
+index 681a3172879..9dea03d1622 100644
+--- a/include/llvm/MC/MCAssembler.h
++++ b/include/llvm/MC/MCAssembler.h
+@@ -858,7 +858,11 @@ public:
+   // A Major version of 0 indicates that no version information was supplied
+   // and so the corresponding load command should not be emitted.
+   typedef struct {
+-    MCVersionMinType Kind;
++    bool EmitBuildVersion;
++    union {
++      MCVersionMinType Kind;          ///< Used when EmitBuildVersion==false.
++      MachO::PlatformType Platform;   ///< Used when EmitBuildVersion==true.
++    } KindOrPlatform;
+     unsigned Major;
+     unsigned Minor;
+     unsigned Update;
+@@ -1013,7 +1017,16 @@ public:
+   const VersionMinInfoType &getVersionMinInfo() const { return VersionMinInfo; }
+   void setVersionMinInfo(MCVersionMinType Kind, unsigned Major, unsigned Minor,
+                          unsigned Update) {
+-    VersionMinInfo.Kind = Kind;
++    VersionMinInfo.EmitBuildVersion = false;
++    VersionMinInfo.KindOrPlatform.Kind = Kind;
++    VersionMinInfo.Major = Major;
++    VersionMinInfo.Minor = Minor;
++    VersionMinInfo.Update = Update;
++  }
++  void setBuildVersion(MachO::PlatformType Platform, unsigned Major,
++                       unsigned Minor, unsigned Update) {
++    VersionMinInfo.EmitBuildVersion = true;
++    VersionMinInfo.KindOrPlatform.Platform = Platform;
+     VersionMinInfo.Major = Major;
+     VersionMinInfo.Minor = Minor;
+     VersionMinInfo.Update = Update;
+diff --git a/include/llvm/MC/MCContext.h b/include/llvm/MC/MCContext.h
+index f209448d1bf..5d3bf8b7d49 100644
+--- a/include/llvm/MC/MCContext.h
++++ b/include/llvm/MC/MCContext.h
+@@ -52,6 +52,9 @@ namespace llvm {
+   public:
+     typedef StringMap<MCSymbol*, BumpPtrAllocator&> SymbolTable;
+   private:
++    /// The triple for this object.
++    Triple TT;
++
+     /// The SourceMgr for this object, if any.
+     const SourceMgr *SrcMgr;
+ 
+@@ -180,11 +183,13 @@ namespace llvm {
+                                                 unsigned Instance);
+ 
+   public:
+-    explicit MCContext(const MCAsmInfo *MAI, const MCRegisterInfo *MRI,
++    explicit MCContext(const Triple &TheTriple, const MCAsmInfo *MAI, const MCRegisterInfo *MRI,
+                        const MCObjectFileInfo *MOFI,
+                        const SourceMgr *Mgr = nullptr, bool DoAutoReset = true);
+     ~MCContext();
+ 
++    const Triple &getTargetTriple() const { return TT; }
++
+     const SourceMgr *getSourceManager() const { return SrcMgr; }
+ 
+     const MCAsmInfo *getAsmInfo() const { return MAI; }
+diff --git a/include/llvm/MC/MCDirectives.h b/include/llvm/MC/MCDirectives.h
+index f9d66e0b15d..f1019ec5bc9 100644
+--- a/include/llvm/MC/MCDirectives.h
++++ b/include/llvm/MC/MCDirectives.h
+@@ -62,7 +62,9 @@ enum MCDataRegionType {
+ 
+ enum MCVersionMinType {
+   MCVM_IOSVersionMin,         ///< .ios_version_min
+-  MCVM_OSXVersionMin          ///< .macosx_version_min
++  MCVM_OSXVersionMin,         ///< .macosx_version_min
++  MCVM_TvOSVersionMin,        ///< .tvos_version_min
++  MCVM_WatchOSVersionMin      ///< .watchos_version_min
+ };
+ 
+ } // end namespace llvm
+diff --git a/include/llvm/MC/MCStreamer.h b/include/llvm/MC/MCStreamer.h
+index 18855f9cf03..0e585fff447 100644
+--- a/include/llvm/MC/MCStreamer.h
++++ b/include/llvm/MC/MCStreamer.h
+@@ -406,6 +406,12 @@ public:
+   /// EmitVersionMin - Specify the MachO minimum deployment target version.
+   virtual void EmitVersionMin(MCVersionMinType, unsigned Major, unsigned Minor,
+                               unsigned Update) {}
++  /// Emit/Specify Mach-O build version command.
++  /// \p Platform should be one of MachO::PlatformType.
++  virtual void EmitBuildVersion(unsigned Platform, unsigned Major,
++                                unsigned Minor, unsigned Update) {}
++
++  void EmitVersionForTarget(const Triple &Target);
+ 
+   /// EmitThumbFunc - Note in the output that the specified @p Func is
+   /// a Thumb mode function (ARM target only).
+diff --git a/include/llvm/Support/MachO.h b/include/llvm/Support/MachO.h
+index 77512750592..296c1655a3f 100644
+--- a/include/llvm/Support/MachO.h
++++ b/include/llvm/Support/MachO.h
+@@ -132,7 +132,10 @@ namespace llvm {
+       LC_DYLIB_CODE_SIGN_DRS  = 0x0000002Bu,
+       LC_ENCRYPTION_INFO_64   = 0x0000002Cu,
+       LC_LINKER_OPTION        = 0x0000002Du,
+-      LC_LINKER_OPTIMIZATION_HINT = 0x0000002Eu
++      LC_LINKER_OPTIMIZATION_HINT = 0x0000002Eu,
++      LC_VERSION_MIN_TVOS     = 0x0000002Fu,
++      LC_VERSION_MIN_WATCHOS  = 0x00000030u,
++      LC_BUILD_VERSION        = 0x00000032u
+     };
+ 
+     enum : uint32_t {
+@@ -530,6 +533,19 @@ namespace llvm {
+       VM_PROT_EXECUTE = 0x4
+     };
+ 
++    // Values for platform field in build_version_command.
++    enum PlatformType {
++      PLATFORM_MACOS = 1,
++      PLATFORM_IOS = 2,
++      PLATFORM_TVOS = 3,
++      PLATFORM_WATCHOS = 4,
++      PLATFORM_BRIDGEOS = 5,
++      PLATFORM_MACCATALYST = 6,
++      PLATFORM_IOSSIMULATOR = 7,
++      PLATFORM_TVOSSIMULATOR = 8,
++      PLATFORM_WATCHOSSIMULATOR = 9,
++      PLATFORM_DRIVERKIT = 10,
++    };
+ 
+     // Structs from <mach-o/loader.h>
+ 
+@@ -859,6 +875,16 @@ namespace llvm {
+       uint32_t sdk;       // X.Y.Z is encoded in nibbles xxxx.yy.zz
+     };
+ 
++    struct build_version_command {
++      uint32_t cmd;      // LC_BUILD_VERSION
++      uint32_t cmdsize;  // sizeof(struct build_version_command) +
++                        // ntools * sizeof(struct build_tool_version)
++      uint32_t platform; // platform
++      uint32_t minos;    // X.Y.Z is encoded in nibbles xxxx.yy.zz
++      uint32_t sdk;      // X.Y.Z is encoded in nibbles xxxx.yy.zz
++      uint32_t ntools;   // number of tool entries following this
++    };
++
+     struct dyld_info_command {
+       uint32_t cmd;
+       uint32_t cmdsize;
+diff --git a/lib/CodeGen/AsmPrinter/AsmPrinter.cpp b/lib/CodeGen/AsmPrinter/AsmPrinter.cpp
+index 97ef12c8328..74c5500bd22 100644
+--- a/lib/CodeGen/AsmPrinter/AsmPrinter.cpp
++++ b/lib/CodeGen/AsmPrinter/AsmPrinter.cpp
+@@ -186,15 +186,7 @@ bool AsmPrinter::doInitialization(Module &M) {
+   // use the directive, where it would need the same conditionalization
+   // anyway.
+   Triple TT(getTargetTriple());
+-  if (TT.isOSDarwin()) {
+-    unsigned Major, Minor, Update;
+-    TT.getOSVersion(Major, Minor, Update);
+-    // If there is a version specified, Major will be non-zero.
+-    if (Major)
+-      OutStreamer.EmitVersionMin((TT.isMacOSX() ?
+-                                  MCVM_OSXVersionMin : MCVM_IOSVersionMin),
+-                                 Major, Minor, Update);
+-  }
++  OutStreamer.EmitVersionForTarget(TT);
+ 
+   // Allow the target to emit any magic that it wants at the start of the file.
+   EmitStartOfAsmFile(M);
+diff --git a/lib/CodeGen/LLVMTargetMachine.cpp b/lib/CodeGen/LLVMTargetMachine.cpp
+index 61face27f14..45afde0f150 100644
+--- a/lib/CodeGen/LLVMTargetMachine.cpp
++++ b/lib/CodeGen/LLVMTargetMachine.cpp
+@@ -113,6 +113,7 @@ static MCContext *addPassesToGenerateCode(LLVMTargetMachine *TM,
+   // Install a MachineModuleInfo class, which is an immutable pass that holds
+   // all the per-module stuff we're generating, including MCContext.
+   MachineModuleInfo *MMI = new MachineModuleInfo(
++      Triple(TM->getTargetTriple()),
+       *TM->getMCAsmInfo(), *TM->getSubtargetImpl()->getRegisterInfo(),
+       &TM->getSubtargetImpl()->getTargetLowering()->getObjFileLowering());
+   PM.add(MMI);
+diff --git a/lib/CodeGen/MachineModuleInfo.cpp b/lib/CodeGen/MachineModuleInfo.cpp
+index eb3c0bf224d..10ffef95ad9 100644
+--- a/lib/CodeGen/MachineModuleInfo.cpp
++++ b/lib/CodeGen/MachineModuleInfo.cpp
+@@ -250,15 +250,16 @@ void MMIAddrLabelMapCallbackPtr::allUsesReplacedWith(Value *V2) {
+ 
+ //===----------------------------------------------------------------------===//
+ 
+-MachineModuleInfo::MachineModuleInfo(const MCAsmInfo &MAI,
++MachineModuleInfo::MachineModuleInfo(const Triple &TheTriple,
++                                     const MCAsmInfo &MAI,
+                                      const MCRegisterInfo &MRI,
+                                      const MCObjectFileInfo *MOFI)
+-  : ImmutablePass(ID), Context(&MAI, &MRI, MOFI, nullptr, false) {
++  : ImmutablePass(ID), Context(TheTriple, &MAI, &MRI, MOFI, nullptr, false) {
+   initializeMachineModuleInfoPass(*PassRegistry::getPassRegistry());
+ }
+ 
+ MachineModuleInfo::MachineModuleInfo()
+-  : ImmutablePass(ID), Context(nullptr, nullptr, nullptr) {
++  : ImmutablePass(ID), Context(Triple(), nullptr, nullptr, nullptr) {
+   llvm_unreachable("This MachineModuleInfo constructor should never be called, "
+                    "MMI should always be explicitly constructed by "
+                    "LLVMTargetMachine");
+diff --git a/lib/MC/MCAsmStreamer.cpp b/lib/MC/MCAsmStreamer.cpp
+index a1233929615..84140009d22 100644
+--- a/lib/MC/MCAsmStreamer.cpp
++++ b/lib/MC/MCAsmStreamer.cpp
+@@ -125,6 +125,8 @@ public:
+   void EmitDataRegion(MCDataRegionType Kind) override;
+   void EmitVersionMin(MCVersionMinType Kind, unsigned Major, unsigned Minor,
+                       unsigned Update) override;
++  void EmitBuildVersion(unsigned Platform, unsigned Major, unsigned Minor, 
++                        unsigned Update) override;
+   void EmitThumbFunc(MCSymbol *Func) override;
+ 
+   void EmitAssignment(MCSymbol *Symbol, const MCExpr *Value) override;
+@@ -369,6 +371,8 @@ void MCAsmStreamer::EmitDataRegion(MCDataRegionType Kind) {
+ void MCAsmStreamer::EmitVersionMin(MCVersionMinType Kind, unsigned Major,
+                                    unsigned Minor, unsigned Update) {
+   switch (Kind) {
++  case MCVM_WatchOSVersionMin:    OS << "\t.watchos_version_min";
++  case MCVM_TvOSVersionMin:       OS << "\t.tvos_version_min";
+   case MCVM_IOSVersionMin:        OS << "\t.ios_version_min"; break;
+   case MCVM_OSXVersionMin:        OS << "\t.macosx_version_min"; break;
+   }
+@@ -378,6 +382,31 @@ void MCAsmStreamer::EmitVersionMin(MCVersionMinType Kind, unsigned Major,
+   EmitEOL();
+ }
+ 
++static const char *getPlatformName(MachO::PlatformType Type) {
++  switch (Type) {
++  case MachO::PLATFORM_MACOS:            return "macos";
++  case MachO::PLATFORM_IOS:              return "ios";
++  case MachO::PLATFORM_TVOS:             return "tvos";
++  case MachO::PLATFORM_WATCHOS:          return "watchos";
++  case MachO::PLATFORM_BRIDGEOS:         return "bridgeos";
++  case MachO::PLATFORM_MACCATALYST:      return "macCatalyst";
++  case MachO::PLATFORM_IOSSIMULATOR:     return "iossimulator";
++  case MachO::PLATFORM_TVOSSIMULATOR:    return "tvossimulator";
++  case MachO::PLATFORM_WATCHOSSIMULATOR: return "watchossimulator";
++  case MachO::PLATFORM_DRIVERKIT:        return "driverkit";
++  }
++  llvm_unreachable("Invalid Mach-O platform type");
++}
++
++void MCAsmStreamer::EmitBuildVersion(unsigned Platform, unsigned Major,
++                                     unsigned Minor, unsigned Update) {
++  const char *PlatformName = getPlatformName((MachO::PlatformType)Platform);
++  OS << "\t.build_version " << PlatformName << ", " << Major << ", " << Minor;
++  if (Update)
++    OS << ", " << Update;
++  EmitEOL();
++}
++
+ void MCAsmStreamer::EmitThumbFunc(MCSymbol *Func) {
+   // This needs to emit to a temporary string to get properly quoted
+   // MCSymbols when they have spaces in them.
+diff --git a/lib/MC/MCContext.cpp b/lib/MC/MCContext.cpp
+index 8630b25a84e..e981d1e25c6 100644
+--- a/lib/MC/MCContext.cpp
++++ b/lib/MC/MCContext.cpp
+@@ -29,10 +29,10 @@
+ 
+ using namespace llvm;
+ 
+-MCContext::MCContext(const MCAsmInfo *mai, const MCRegisterInfo *mri,
++MCContext::MCContext(const Triple &TheTriple, const MCAsmInfo *mai, const MCRegisterInfo *mri,
+                      const MCObjectFileInfo *mofi, const SourceMgr *mgr,
+                      bool DoAutoReset)
+-    : SrcMgr(mgr), MAI(mai), MRI(mri), MOFI(mofi), Allocator(),
++    : TT(TheTriple), SrcMgr(mgr), MAI(mai), MRI(mri), MOFI(mofi), Allocator(),
+       Symbols(Allocator), UsedNames(Allocator), NextUniqueID(0),
+       CurrentDwarfLoc(0, 0, 0, DWARF2_FLAG_IS_STMT, 0, 0), DwarfLocSeen(false),
+       GenDwarfForAssembly(false), GenDwarfFileNumber(0), DwarfVersion(4),
+diff --git a/lib/MC/MCDisassembler/Disassembler.cpp b/lib/MC/MCDisassembler/Disassembler.cpp
+index d0d7f307dae..823c13579fa 100644
+--- a/lib/MC/MCDisassembler/Disassembler.cpp
++++ b/lib/MC/MCDisassembler/Disassembler.cpp
+@@ -62,7 +62,7 @@ LLVMCreateDisasmCPUFeatures(const char *Triple, const char *CPU,
+     return nullptr;
+ 
+   // Set up the MCContext for creating symbols and MCExpr's.
+-  MCContext *Ctx = new MCContext(MAI, MRI, nullptr);
++  MCContext *Ctx = new MCContext(::Triple(Triple), MAI, MRI, nullptr);
+   if (!Ctx)
+     return nullptr;
+ 
+diff --git a/lib/MC/MCMachOStreamer.cpp b/lib/MC/MCMachOStreamer.cpp
+index a147c3dda38..8159c2b3598 100644
+--- a/lib/MC/MCMachOStreamer.cpp
++++ b/lib/MC/MCMachOStreamer.cpp
+@@ -72,6 +72,8 @@ public:
+   void EmitDataRegion(MCDataRegionType Kind) override;
+   void EmitVersionMin(MCVersionMinType Kind, unsigned Major,
+                       unsigned Minor, unsigned Update) override;
++  void EmitBuildVersion(unsigned Platform, unsigned Major, unsigned Minor, 
++                        unsigned Update) override;
+   void EmitThumbFunc(MCSymbol *Func) override;
+   bool EmitSymbolAttribute(MCSymbol *Symbol, MCSymbolAttr Attribute) override;
+   void EmitSymbolDesc(MCSymbol *Symbol, unsigned DescValue) override;
+@@ -235,6 +237,12 @@ void MCMachOStreamer::EmitVersionMin(MCVersionMinType Kind, unsigned Major,
+   getAssembler().setVersionMinInfo(Kind, Major, Minor, Update);
+ }
+ 
++void MCMachOStreamer::EmitBuildVersion(unsigned Platform, unsigned Major,
++                                       unsigned Minor, unsigned Update) {
++  getAssembler().setBuildVersion((MachO::PlatformType)Platform, Major, Minor,
++                                 Update);
++}
++
+ void MCMachOStreamer::EmitThumbFunc(MCSymbol *Symbol) {
+   // Remember that the function is a thumb function. Fixup and relocation
+   // values will need adjusted.
+@@ -458,6 +466,8 @@ MCStreamer *llvm::createMachOStreamer(MCContext &Context, MCAsmBackend &MAB,
+                                       bool RelaxAll,
+                                       bool LabelSections) {
+   MCMachOStreamer *S = new MCMachOStreamer(Context, MAB, OS, CE, LabelSections);
++  const Triple &Target = Context.getTargetTriple();
++  S->EmitVersionForTarget(Target);
+   if (RelaxAll)
+     S->getAssembler().setRelaxAll(true);
+   return S;
+diff --git a/lib/MC/MCParser/DarwinAsmParser.cpp b/lib/MC/MCParser/DarwinAsmParser.cpp
+index 3ea745eba57..93f76faefc2 100644
+--- a/lib/MC/MCParser/DarwinAsmParser.cpp
++++ b/lib/MC/MCParser/DarwinAsmParser.cpp
+@@ -37,6 +37,7 @@ class DarwinAsmParser : public MCAsmParserExtension {
+   bool parseSectionSwitch(const char *Segment, const char *Section,
+                           unsigned TAA = 0, unsigned ImplicitAlign = 0,
+                           unsigned StubSize = 0);
++  SMLoc LastVersionDirective;
+ 
+ public:
+   DarwinAsmParser() {}
+@@ -167,6 +168,7 @@ public:
+     addDirectiveHandler<&DarwinAsmParser::parseVersionMin>(".ios_version_min");
+     addDirectiveHandler<&DarwinAsmParser::parseVersionMin>(
+       ".macosx_version_min");
++    addDirectiveHandler<&DarwinAsmParser::parseBuildVersion>(".build_version");
+   }
+ 
+   bool parseDirectiveDesc(StringRef, SMLoc);
+@@ -364,8 +366,11 @@ public:
+     return parseSectionSwitch("__DATA", "__thread_init",
+                          MachO::S_THREAD_LOCAL_INIT_FUNCTION_POINTERS);
+   }
++  bool parseVersion(int64_t &Major, int64_t &Minor, int64_t &Update);
+   bool parseVersionMin(StringRef, SMLoc);
+-
++  bool parseBuildVersion(StringRef Directive, SMLoc Loc);
++  void checkVersion(StringRef Directive, StringRef Arg, SMLoc Loc,
++                    Triple::OSType ExpectedOS);
+ };
+ 
+ } // end anonymous namespace
+@@ -864,15 +869,10 @@ bool DarwinAsmParser::parseDirectiveDataRegionEnd(StringRef, SMLoc) {
+   return false;
+ }
+ 
+-/// parseVersionMin
+-///  ::= .ios_version_min major,minor[,update]
+-///  ::= .macosx_version_min major,minor[,update]
+-bool DarwinAsmParser::parseVersionMin(StringRef Directive, SMLoc) {
+-  int64_t Major = 0, Minor = 0, Update = 0;
+-  int Kind = StringSwitch<int>(Directive)
+-    .Case(".ios_version_min", MCVM_IOSVersionMin)
+-    .Case(".macosx_version_min", MCVM_OSXVersionMin);
++bool DarwinAsmParser::parseVersion(int64_t &Major, int64_t &Minor,
++                                   int64_t &Update) {
++  Major = Minor = Update = 0;
+   // Get the major version number.
+   if (getLexer().isNot(AsmToken::Integer))
+     return TokError("invalid OS major version number");
+   Major = getLexer().getTok().getIntVal();
+@@ -901,6 +901,21 @@ bool DarwinAsmParser::parseVersionMin(StringRef Directive, SMLoc) {
+     return TokError("invalid OS update number");
+     Lex();
+   }
++  return false;
++}
++
++/// parseVersionMin
++///  ::= .ios_version_min major,minor[,update]
++///  ::= .macosx_version_min major,minor[,update]
++bool DarwinAsmParser::parseVersionMin(StringRef Directive, SMLoc) {
++  int64_t Major = 0, Minor = 0, Update = 0;
++  int Kind = StringSwitch<int>(Directive)
++    .Case(".watchos_version_min", MCVM_WatchOSVersionMin)
++    .Case(".tvos_version_min",    MCVM_TvOSVersionMin)
++    .Case(".ios_version_min",     MCVM_IOSVersionMin)
++    .Case(".macosx_version_min",  MCVM_OSXVersionMin);
++  if (parseVersion(Major, Minor, Update))
++    return true;
+ 
+   // We've parsed a correct version specifier, so send it to the streamer.
+   getStreamer().EmitVersionMin((MCVersionMinType)Kind, Major, Minor, Update);
+@@ -908,6 +923,74 @@ bool DarwinAsmParser::parseVersionMin(StringRef Directive, SMLoc) {
+   return false;
+ }
+ 
++static Triple::OSType getOSTypeFromPlatform(MachO::PlatformType Type) {
++  switch (Type) {
++  case MachO::PLATFORM_MACOS:   return Triple::MacOSX;
++  case MachO::PLATFORM_IOS:     return Triple::IOS;
++  case MachO::PLATFORM_TVOS:    return Triple::TvOS;
++  case MachO::PLATFORM_WATCHOS: return Triple::WatchOS;
++  case MachO::PLATFORM_BRIDGEOS:         /* silence warning */ break;
++  case MachO::PLATFORM_MACCATALYST: return Triple::IOS;
++  case MachO::PLATFORM_IOSSIMULATOR: return Triple::IOS;
++  case MachO::PLATFORM_TVOSSIMULATOR: return Triple::TvOS;
++  case MachO::PLATFORM_WATCHOSSIMULATOR: /* silence warning */ break;
++  case MachO::PLATFORM_DRIVERKIT:        /* silence warning */ break;
++  }
++  llvm_unreachable("Invalid mach-o platform type");
++}
++
++void DarwinAsmParser::checkVersion(StringRef Directive, StringRef Arg,
++                                   SMLoc Loc, Triple::OSType ExpectedOS) {
++  const Triple &Target = getContext().getTargetTriple();
++  if (Target.getOS() != ExpectedOS)
++    Warning(Loc, Twine(Directive) +
++            (Arg.empty() ? Twine() : Twine(' ') + Arg) +
++            " used while targeting " + Target.getOSName());
++
++  if (LastVersionDirective.isValid()) {
++    Warning(Loc, "overriding previous version directive");
++  }
++  LastVersionDirective = Loc;
++}
++
++/// parseBuildVersion
++///   ::= .build_version (macos|ios|tvos|watchos), parseVersion parseSDKVersion
++bool DarwinAsmParser::parseBuildVersion(StringRef Directive, SMLoc Loc) {
++  StringRef PlatformName;
++  SMLoc PlatformLoc = getTok().getLoc();
++  if (getParser().parseIdentifier(PlatformName))
++    return TokError("platform name expected");
++
++  unsigned Platform = StringSwitch<unsigned>(PlatformName)
++    .Case("macos", MachO::PLATFORM_MACOS)
++    .Case("ios", MachO::PLATFORM_IOS)
++    .Case("tvos", MachO::PLATFORM_TVOS)
++    .Case("watchos", MachO::PLATFORM_WATCHOS)
++    .Case("macCatalyst", MachO::PLATFORM_MACCATALYST)
++    .Case("iossimulator", MachO::PLATFORM_IOSSIMULATOR)
++    .Case("tvossimulator", MachO::PLATFORM_TVOSSIMULATOR)
++    .Case("watchos", MachO::PLATFORM_WATCHOS)
++    .Default(0);
++  if (Platform == 0)
++    return Error(PlatformLoc, "unknown platform name");
++
++  if (getLexer().isNot(AsmToken::Comma))
++    return TokError("version number required, comma expected");
++  Lex();
++
++  int64_t Major;
++  int64_t Minor;
++  int64_t Update;
++  if (parseVersion(Major, Minor, Update))
++    return true;
++
++  Triple::OSType ExpectedOS
++    = getOSTypeFromPlatform((MachO::PlatformType)Platform);
++  checkVersion(Directive, PlatformName, Loc, ExpectedOS);
++  getStreamer().EmitBuildVersion(Platform, Major, Minor, Update);
++  return false;
++}
++
+ namespace llvm {
+ 
+ MCAsmParserExtension *createDarwinAsmParser() {
+diff --git a/lib/MC/MCStreamer.cpp b/lib/MC/MCStreamer.cpp
+index f11ee669b4b..a2b3d442dcf 100644
+--- a/lib/MC/MCStreamer.cpp
++++ b/lib/MC/MCStreamer.cpp
+@@ -661,3 +661,122 @@ void MCStreamer::EmitBundleAlignMode(unsigned AlignPow2) {}
+ void MCStreamer::EmitBundleLock(bool AlignToEnd) {}
+ void MCStreamer::FinishImpl() {}
+ void MCStreamer::EmitBundleUnlock() {}
++
++static void
++targetVersionOrMinimumSupportedOSVersion(const Triple &Target,
++                                         unsigned &Major, unsigned &Minor,
++                                         unsigned &Micro) {
++  unsigned MinMajor, MinMinor, MinMicro;
++  Target.getMinimumSupportedOSVersion(MinMajor, MinMinor, MinMicro);
++  if (MinMajor != 0 && std::tie(Major, Minor, Micro) < std::tie(MinMajor, MinMinor, MinMicro)) {
++    Major = MinMajor;
++    Minor = MinMinor;
++    Micro = MinMicro;
++  }
++}
++
++static MCVersionMinType
++getMachoVersionMinLoadCommandType(const Triple &Target) {
++  assert(Target.isOSDarwin() && "expected a darwin OS");
++  switch (Target.getOS()) {
++  case Triple::MacOSX:
++  case Triple::Darwin:
++    return MCVM_OSXVersionMin;
++  case Triple::IOS:
++    return MCVM_IOSVersionMin;
++  case Triple::TvOS:
++    return MCVM_TvOSVersionMin;
++  case Triple::WatchOS:
++    return MCVM_WatchOSVersionMin;
++  default:
++    break;
++  }
++  llvm_unreachable("unexpected OS type");
++}
++
++static void getMachoBuildVersionSupportedOS(const Triple &Target,
++                                            unsigned &Major, unsigned &Minor, 
++                                            unsigned &Micro) {
++  Major = Minor = Micro = 0;
++  assert(Target.isOSDarwin() && "expected a darwin OS");
++  switch (Target.getOS()) {
++  case Triple::MacOSX:
++  case Triple::Darwin:
++    Major = 10;
++    Minor = 14;
++    return;
++  case Triple::IOS:
++  case Triple::TvOS:
++    Major = 12;
++    return;
++  case Triple::WatchOS:
++    Major = 5;
++    return;
++  default:
++    break;
++  }
++  llvm_unreachable("unexpected OS type");
++}
++
++static MachO::PlatformType
++getMachoBuildVersionPlatformType(const Triple &Target) {
++  assert(Target.isOSDarwin() && "expected a darwin OS");
++  switch (Target.getOS()) {
++  case Triple::MacOSX:
++  case Triple::Darwin:
++    return MachO::PLATFORM_MACOS;
++  case Triple::IOS:
++    if (Target.isMacCatalystEnvironment())
++      return MachO::PLATFORM_MACCATALYST;
++    return Target.isSimulatorEnvironment() ? MachO::PLATFORM_IOSSIMULATOR
++                                           : MachO::PLATFORM_IOS;
++  case Triple::TvOS:
++    return Target.isSimulatorEnvironment() ? MachO::PLATFORM_TVOSSIMULATOR
++                                           : MachO::PLATFORM_TVOS;
++  case Triple::WatchOS:
++    return Target.isSimulatorEnvironment() ? MachO::PLATFORM_WATCHOSSIMULATOR
++                                           : MachO::PLATFORM_WATCHOS;
++  default:
++    break;
++  }
++  llvm_unreachable("unexpected OS type");
++}
++
++void MCStreamer::EmitVersionForTarget(const Triple &Target) {
++  if (!Target.isOSBinFormatMachO() || !Target.isOSDarwin())
++    return;
++  // Do we even know the version?
++  if (Target.getOSMajorVersion() == 0)
++    return;
++
++  unsigned Major = 0;
++  unsigned Minor = 0;
++  unsigned Update = 0;
++  switch (Target.getOS()) {
++  case Triple::MacOSX:
++  case Triple::Darwin:
++    Target.getMacOSXVersion(Major, Minor, Update);
++    break;
++  case Triple::IOS:
++  case Triple::TvOS:
++    Target.getiOSVersion(Major, Minor, Update);
++    break;
++  case Triple::WatchOS:
++    Target.getWatchOSVersion(Major, Minor, Update);
++    break;
++  default:
++    llvm_unreachable("unexpected OS type");
++  }
++  assert(Major != 0 && "A non-zero major version is expected");
++  targetVersionOrMinimumSupportedOSVersion(Target, Major, Minor, Update);
++  unsigned BuildOSMajor = 0;
++  unsigned BuildOSMinor = 0;
++  unsigned BuildOSUpdate = 0;
++  getMachoBuildVersionSupportedOS(Target, BuildOSMajor, BuildOSMinor, BuildOSUpdate);
++  if (BuildOSMajor == 0 || 
++      std::tie(Major, Minor, Update) >= std::tie(BuildOSMajor, BuildOSMinor, BuildOSUpdate))
++    return EmitBuildVersion(getMachoBuildVersionPlatformType(Target), Major, Minor, Update);
++
++  EmitVersionMin(getMachoVersionMinLoadCommandType(Target), 
++                 Major, Minor, Update);
++}
+diff --git a/lib/MC/MachObjectWriter.cpp b/lib/MC/MachObjectWriter.cpp
+index d3751bd9ba5..51cb40cff3c 100644
+--- a/lib/MC/MachObjectWriter.cpp
++++ b/lib/MC/MachObjectWriter.cpp
+@@ -747,6 +747,16 @@ IsSymbolRefDifferenceFullyResolvedImpl(const MCAssembler &Asm,
+   return false;
+ }
+ 
++static MachO::LoadCommandType getLCFromMCVM(MCVersionMinType Type) {
++  switch (Type) {
++  case MCVM_OSXVersionMin:     return MachO::LC_VERSION_MIN_MACOSX;
++  case MCVM_IOSVersionMin:     return MachO::LC_VERSION_MIN_IPHONEOS;
++  case MCVM_TvOSVersionMin:    return MachO::LC_VERSION_MIN_TVOS;
++  case MCVM_WatchOSVersionMin: return MachO::LC_VERSION_MIN_WATCHOS;
++  }
++  llvm_unreachable("Invalid mc version min type");
++}
++
+ void MachObjectWriter::WriteObject(MCAssembler &Asm,
+                                    const MCAsmLayout &Layout) {
+   unsigned NumSections = Asm.size();
+@@ -763,7 +773,10 @@ void MachObjectWriter::WriteObject(MCAssembler &Asm,
+   // Add the deployment target version info load command size, if used.
+   if (VersionInfo.Major != 0) {
+     ++NumLoadCommands;
+-    LoadCommandsSize += sizeof(MachO::version_min_command);
++    if (VersionInfo.EmitBuildVersion)
++      LoadCommandsSize += sizeof(MachO::build_version_command);
++    else
++      LoadCommandsSize += sizeof(MachO::version_min_command);
+   }
+ 
+   // Add the data-in-code load command size, if used.
+@@ -853,11 +866,23 @@ void MachObjectWriter::WriteObject(MCAssembler &Asm,
+     assert(VersionInfo.Major < 65536 && "unencodable major target version");
+     uint32_t EncodedVersion = VersionInfo.Update | (VersionInfo.Minor << 8) |
+       (VersionInfo.Major << 16);
+-    Write32(VersionInfo.Kind == MCVM_OSXVersionMin ? MachO::LC_VERSION_MIN_MACOSX :
+-            MachO::LC_VERSION_MIN_IPHONEOS);
+-    Write32(sizeof(MachO::version_min_command));
+-    Write32(EncodedVersion);
++    if (VersionInfo.EmitBuildVersion) {
++      // FIXME: Currently empty tools. Add clang version in the future.
++      Write32(MachO::LC_BUILD_VERSION);
++      Write32(sizeof(MachO::build_version_command));
++      Write32(VersionInfo.KindOrPlatform.Platform);
++      Write32(EncodedVersion);
++      Write32(0);         // Empty SDK version
++      Write32(0);         // Empty tools list.
++    } else {
++      MachO::LoadCommandType LCType
++        = getLCFromMCVM(VersionInfo.KindOrPlatform.Kind);
++      Write32(LCType);
++      Write32(sizeof(MachO::version_min_command));
++      Write32(EncodedVersion);
+     Write32(0);         // reserved.
++    }
++
+   }
+ 
+   // Write the data-in-code load command, if used.
+diff --git a/lib/Object/IRObjectFile.cpp b/lib/Object/IRObjectFile.cpp
+index 8ceee8e6ab5..c0e44f07532 100644
+--- a/lib/Object/IRObjectFile.cpp
++++ b/lib/Object/IRObjectFile.cpp
+@@ -70,7 +70,7 @@ IRObjectFile::IRObjectFile(MemoryBufferRef Object, std::unique_ptr<Module> Mod)
+     return;
+ 
+   MCObjectFileInfo MOFI;
+-  MCContext MCCtx(MAI.get(), MRI.get(), &MOFI);
++  MCContext MCCtx(::Triple(Triple), MAI.get(), MRI.get(), &MOFI);
+   MOFI.InitMCObjectFileInfo(Triple, Reloc::Default, CodeModel::Default, MCCtx);
+   std::unique_ptr<RecordStreamer> Streamer(new RecordStreamer(MCCtx));
+ 
+diff --git a/lib/Support/Triple.cpp b/lib/Support/Triple.cpp
+index 64cd6e73e9e..e1efb544bfa 100644
+--- a/lib/Support/Triple.cpp
++++ b/lib/Support/Triple.cpp
+@@ -158,6 +158,8 @@ const char *Triple::getOSTypeName(OSType Kind) {
+   case CUDA: return "cuda";
+   case NVCL: return "nvcl";
+   case AMDHSA: return "amdhsa";
++  case TvOS: return "tvos";
++  case WatchOS: return "watchos";
+   }
+ 
+   llvm_unreachable("Invalid OSType");
+@@ -177,6 +179,8 @@ const char *Triple::getEnvironmentTypeName(EnvironmentType Kind) {
+   case MSVC: return "msvc";
+   case Itanium: return "itanium";
+   case Cygnus: return "cygnus";
++  case Simulator: return "simulator";
++  case MacABI: return "macabi";
+   }
+ 
+   llvm_unreachable("Invalid EnvironmentType!");
+@@ -331,7 +335,7 @@ static Triple::OSType parseOS(StringRef OSName) {
+     .StartsWith("kfreebsd", Triple::KFreeBSD)
+     .StartsWith("linux", Triple::Linux)
+     .StartsWith("lv2", Triple::Lv2)
+-    .StartsWith("macosx", Triple::MacOSX)
++    .StartsWith("macos", Triple::MacOSX)
+     .StartsWith("netbsd", Triple::NetBSD)
+     .StartsWith("openbsd", Triple::OpenBSD)
+     .StartsWith("solaris", Triple::Solaris)
+@@ -347,6 +351,8 @@ static Triple::OSType parseOS(StringRef OSName) {
+     .StartsWith("cuda", Triple::CUDA)
+     .StartsWith("nvcl", Triple::NVCL)
+     .StartsWith("amdhsa", Triple::AMDHSA)
++    .StartsWith("tvos", Triple::TvOS)
++    .StartsWith("watchos", Triple::WatchOS)
+     .Default(Triple::UnknownOS);
+ }
+ 
+@@ -363,6 +369,8 @@ static Triple::EnvironmentType parseEnvironment(StringRef EnvironmentName) {
+     .StartsWith("msvc", Triple::MSVC)
+     .StartsWith("itanium", Triple::Itanium)
+     .StartsWith("cygnus", Triple::Cygnus)
++    .StartsWith("simulator", Triple::Simulator)
++    .StartsWith("macabi", Triple::MacABI)
+     .Default(Triple::UnknownEnvironment);
+ }
+ 
+@@ -375,6 +383,9 @@ static Triple::ObjectFormatType parseFormat(StringRef EnvironmentName) {
+ }
+ 
+ static Triple::SubArchType parseSubArch(StringRef SubArchName) {
++  if (SubArchName == "arm64e")
++    return Triple::AArch64SubArch_arm64e;
++
+   return StringSwitch<Triple::SubArchType>(SubArchName)
+     .EndsWith("v8", Triple::ARMSubArch_v8)
+     .EndsWith("v8a", Triple::ARMSubArch_v8)
+@@ -724,20 +735,28 @@ bool Triple::getMacOSXVersion(unsigned &Major, unsigned &Minor,
+     // Darwin version numbers are skewed from OS X versions.
+     if (Major < 4)
+       return false;
+-    Micro = 0;
+-    Minor = Major - 4;
+-    Major = 10;
++    if (Major <= 19) {
++      Micro = 0;
++      Minor = Major - 4;
++      Major = 10;
++    } else {
++      Micro = 0;
++      Minor = 0;
++      // darwin20+ corresponds to macOS 11+.
++      Major = 11 + Major - 20;
++    }
+     break;
+   case MacOSX:
+     // Default to 10.4.
+     if (Major == 0) {
+       Major = 10;
+       Minor = 4;
+-    }
+-    if (Major != 10)
++    } else if (Major < 10)
+       return false;
+     break;
+   case IOS:
++  case TvOS:
++  case WatchOS:
+     // Ignore the version from the triple.  This is only handled because the
+     // the clang driver combines OS X and IOS support into a common Darwin
+     // toolchain that wants to know the OS X version number even when targeting
+@@ -765,11 +784,38 @@ void Triple::getiOSVersion(unsigned &Major, unsigned &Minor,
+     Micro = 0;
+     break;
+   case IOS:
++  case TvOS:
+     getOSVersion(Major, Minor, Micro);
+     // Default to 5.0 (or 7.0 for arm64).
+     if (Major == 0)
+       Major = (getArch() == aarch64) ? 7 : 5;
+     break;
++  case WatchOS:
++    llvm_unreachable("conflicting triple info");
++  }
++}
++
++void Triple::getWatchOSVersion(unsigned &Major, unsigned &Minor,
++                               unsigned &Micro) const {
++  switch (getOS()) {
++  default: llvm_unreachable("unexpected OS for Darwin triple");
++  case Darwin:
++  case MacOSX:
++    // Ignore the version from the triple.  This is only handled because the
++    // the clang driver combines OS X and IOS support into a common Darwin
++    // toolchain that wants to know the iOS version number even when targeting
++    // OS X.
++    Major = 2;
++    Minor = 0;
++    Micro = 0;
++    break;
++  case WatchOS:
++    getOSVersion(Major, Minor, Micro);
++    if (Major == 0)
++      Major = 2;
++    break;
++  case IOS:
++    llvm_unreachable("conflicting triple info");
+   }
+ }
+ 
+@@ -989,6 +1035,40 @@ Triple Triple::get64BitArchVariant() const {
+   return T;
+ }
+ 
++void Triple::getMinimumSupportedOSVersion(unsigned &Major, unsigned &Minor,
++                                          unsigned &Micro) const {
++  // defaults to 0.
++  Major = Minor = Micro = 0;
++  if (getVendor() != Triple::Apple || getArch() != Triple::aarch64)
++    return;
++  switch (getOS()) {
++  case Triple::MacOSX:
++    // ARM64 slice is supported starting from macOS 11.0+.
++    Major = 11;
++    break;
++  case Triple::IOS:
++    // ARM64 slice is supported starting from Mac Catalyst 14 (macOS 11).
++    // ARM64 simulators are supported for iOS 14+.
++    if (isMacCatalystEnvironment() || isSimulatorEnvironment()) {
++      Major = 14;
++    } else if (isArm64e()) // ARM64e slice is supported starting from iOS 14.
++      Major = 14;
++    break;
++  case Triple::TvOS:
++    // ARM64 simulators are supported for tvOS 14+.
++    if (isSimulatorEnvironment())
++      Major = 14;
++    break;
++  case Triple::WatchOS:
++    // ARM64 simulators are supported for watchOS 7+.
++    if (isSimulatorEnvironment())
++      Major = 7;
++    break;
++  default:
++    break;
++  }
++}
++
+ // FIXME: tblgen this.
+ const char *Triple::getARMCPUForArch(StringRef MArch) const {
+   if (MArch.empty())
+diff --git a/tools/llvm-mc/Disassembler.cpp b/tools/llvm-mc/Disassembler.cpp
+index 5ffeffc0768..f86a950dfb3 100644
+--- a/tools/llvm-mc/Disassembler.cpp
++++ b/tools/llvm-mc/Disassembler.cpp
+@@ -151,7 +151,7 @@ int Disassembler::disassemble(const Target &T,
+   }
+ 
+   // Set up the MCContext for creating symbols and MCExpr's.
+-  MCContext Ctx(MAI.get(), MRI.get(), nullptr);
++  MCContext Ctx(::Triple(Triple), MAI.get(), MRI.get(), nullptr);
+ 
+   std::unique_ptr<const MCDisassembler> DisAsm(
+     T.createMCDisassembler(STI, Ctx));
+diff --git a/tools/llvm-mc/llvm-mc.cpp b/tools/llvm-mc/llvm-mc.cpp
+index 78fe9b72f20..8b3ad665f18 100644
+--- a/tools/llvm-mc/llvm-mc.cpp
++++ b/tools/llvm-mc/llvm-mc.cpp
+@@ -401,7 +401,7 @@ int main(int argc, char **argv) {
+   // FIXME: This is not pretty. MCContext has a ptr to MCObjectFileInfo and
+   // MCObjectFileInfo needs a MCContext reference in order to initialize itself.
+   MCObjectFileInfo MOFI;
+-  MCContext Ctx(MAI.get(), MRI.get(), &MOFI, &SrcMgr);
++  MCContext Ctx(Triple(TripleName), MAI.get(), MRI.get(), &MOFI, &SrcMgr);
+   MOFI.InitMCObjectFileInfo(TripleName, RelocModel, CMModel, Ctx);
+ 
+   if (SaveTempLabels)
+diff --git a/tools/llvm-objdump/MachODump.cpp b/tools/llvm-objdump/MachODump.cpp
+index 36db9ad5366..e1c10803b3a 100644
+--- a/tools/llvm-objdump/MachODump.cpp
++++ b/tools/llvm-objdump/MachODump.cpp
+@@ -1819,7 +1819,7 @@ static void DisassembleInputMachO2(StringRef Filename, MachOObjectFile *MachOOF,
+       TheTarget->createMCAsmInfo(*MRI, TripleName));
+   std::unique_ptr<const MCSubtargetInfo> STI(
+       TheTarget->createMCSubtargetInfo(TripleName, MCPU, FeaturesStr));
+-  MCContext Ctx(AsmInfo.get(), MRI.get(), nullptr);
++  MCContext Ctx(Triple(TripleName), AsmInfo.get(), MRI.get(), nullptr);
+   std::unique_ptr<MCDisassembler> DisAsm(
+       TheTarget->createMCDisassembler(*STI, Ctx));
+   std::unique_ptr<MCSymbolizer> Symbolizer;
+@@ -1869,7 +1869,7 @@ static void DisassembleInputMachO2(StringRef Filename, MachOObjectFile *MachOOF,
+         ThumbTarget->createMCAsmInfo(*ThumbMRI, ThumbTripleName));
+     ThumbSTI.reset(
+         ThumbTarget->createMCSubtargetInfo(ThumbTripleName, MCPU, FeaturesStr));
+-    ThumbCtx.reset(new MCContext(ThumbAsmInfo.get(), ThumbMRI.get(), nullptr));
++    ThumbCtx.reset(new MCContext(Triple(ThumbTripleName), ThumbAsmInfo.get(), ThumbMRI.get(), nullptr));
+     ThumbDisAsm.reset(ThumbTarget->createMCDisassembler(*ThumbSTI, *ThumbCtx));
+     MCContext *PtrThumbCtx = ThumbCtx.get();
+     ThumbRelInfo.reset(
+diff --git a/tools/llvm-objdump/llvm-objdump.cpp b/tools/llvm-objdump/llvm-objdump.cpp
+index 284b334a9d2..6dba9796ecd 100644
+--- a/tools/llvm-objdump/llvm-objdump.cpp
++++ b/tools/llvm-objdump/llvm-objdump.cpp
+@@ -272,7 +272,7 @@ static void DisassembleObject(const ObjectFile *Obj, bool InlineRelocs) {
+   }
+ 
+   std::unique_ptr<const MCObjectFileInfo> MOFI(new MCObjectFileInfo);
+-  MCContext Ctx(AsmInfo.get(), MRI.get(), MOFI.get());
++  MCContext Ctx(Triple(TripleName), AsmInfo.get(), MRI.get(), MOFI.get());
+ 
+   std::unique_ptr<MCDisassembler> DisAsm(
+     TheTarget->createMCDisassembler(*STI, Ctx));
+diff --git a/tools/llvm-rtdyld/llvm-rtdyld.cpp b/tools/llvm-rtdyld/llvm-rtdyld.cpp
+index c38e42307dd..912bc9dd995 100644
+--- a/tools/llvm-rtdyld/llvm-rtdyld.cpp
++++ b/tools/llvm-rtdyld/llvm-rtdyld.cpp
+@@ -497,7 +497,7 @@ static int linkAndVerify() {
+   std::unique_ptr<MCAsmInfo> MAI(TheTarget->createMCAsmInfo(*MRI, TripleName));
+   assert(MAI && "Unable to create target asm info!");
+ 
+-  MCContext Ctx(MAI.get(), MRI.get(), nullptr);
++  MCContext Ctx(Triple(TripleName), MAI.get(), MRI.get(), nullptr);
+ 
+   std::unique_ptr<MCDisassembler> Disassembler(
+     TheTarget->createMCDisassembler(*STI, Ctx));
+diff --git a/tools/clang/lib/Parse/ParseStmtAsm.cpp b/tools/clang/lib/Parse/ParseStmtAsm.cpp
+index 7bf4da6d1b..0f2ac4cc03 100644
+--- a/tools/clang/lib/Parse/ParseStmtAsm.cpp
++++ b/tools/clang/lib/Parse/ParseStmtAsm.cpp
+@@ -511,7 +511,7 @@ StmtResult Parser::ParseMicrosoftAsmStatement(SourceLocation AsmLoc) {
+       TheTarget->createMCSubtargetInfo(TT, "", ""));
+
+   llvm::SourceMgr TempSrcMgr;
+-  llvm::MCContext Ctx(MAI.get(), MRI.get(), MOFI.get(), &TempSrcMgr);
++  llvm::MCContext Ctx(TheTriple, MAI.get(), MRI.get(), MOFI.get(), &TempSrcMgr);
+   MOFI->InitMCObjectFileInfo(TT, llvm::Reloc::Default, llvm::CodeModel::Default,
+                              Ctx);
+   std::unique_ptr<llvm::MemoryBuffer> Buffer =
+diff --git a/tools/clang/tools/driver/cc1as_main.cpp b/tools/clang/tools/driver/cc1as_main.cpp
+index 55c9fe602f..ee36eacdab 100644
+--- a/tools/clang/tools/driver/cc1as_main.cpp
++++ b/tools/clang/tools/driver/cc1as_main.cpp
+@@ -324,7 +324,7 @@ static bool ExecuteAssembler(AssemblerInvocation &Opts,
+   // MCObjectFileInfo needs a MCContext reference in order to initialize itself.
+   std::unique_ptr<MCObjectFileInfo> MOFI(new MCObjectFileInfo());
+
+-  MCContext Ctx(MAI.get(), MRI.get(), MOFI.get(), &SrcMgr);
++  MCContext Ctx(Triple(Opts.Triple), MAI.get(), MRI.get(), MOFI.get(), &SrcMgr);
+   // FIXME: Assembler behavior can change with -static.
+   MOFI->InitMCObjectFileInfo(Opts.Triple,
+                              Reloc::Default, CodeModel::Default, Ctx);
+diff --git a/lib/Basic/Targets.cpp b/lib/Basic/Targets.cpp
+index 56dcf7d0ec..634165c61b 100644
+--- a/tools/clang/lib/Basic/Targets.cpp
++++ b/tools/clang/lib/Basic/Targets.cpp
+@@ -141,7 +141,7 @@ static void getDarwinDefines(MacroBuilder &Builder, const LangOptions &Opts,
+
+   // Set the appropriate OS version define.
+   if (Triple.isiOS()) {
+-    assert(Maj < 10 && Min < 100 && Rev < 100 && "Invalid version!");
++    assert(Maj < 255 && Min < 255 && Rev < 255 && "Invalid version!");
+     char Str[6];
+     Str[0] = '0' + Maj;
+     Str[1] = '0' + (Min / 10);
+@@ -156,7 +156,7 @@ static void getDarwinDefines(MacroBuilder &Builder, const LangOptions &Opts,
+     // define (because we only get a single digit for the minor and micro
+     // revision numbers). So, we limit them to the maximum representable
+     // version.
+-    assert(Maj < 100 && Min < 100 && Rev < 100 && "Invalid version!");
++    assert(Maj < 255 && Min < 255 && Rev < 255 && "Invalid version!");
+     char Str[7];
+     if (Maj < 10 || (Maj == 10 && Min < 10)) {
+       Str[0] = '0' + (Maj / 10);

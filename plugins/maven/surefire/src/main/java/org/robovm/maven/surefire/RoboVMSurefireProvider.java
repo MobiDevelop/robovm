@@ -41,6 +41,7 @@ import org.robovm.compiler.Version;
 import org.robovm.compiler.config.Arch;
 import org.robovm.compiler.config.Config;
 import org.robovm.compiler.config.Config.Home;
+import org.robovm.compiler.config.Environment;
 import org.robovm.compiler.config.OS;
 import org.robovm.compiler.log.Logger;
 import org.robovm.compiler.target.LaunchParameters;
@@ -64,6 +65,7 @@ public class RoboVMSurefireProvider extends AbstractProvider {
     private final static String PROP_SERVER_DEBUG = "robovm.test.enableServerLogging";
     private final static String PROP_OS = "robovm.test.os";
     private final static String PROP_ARCH = "robovm.test.arch";
+    private final static String PROP_ENVIRONMENT = "robovm.test.environment";
     private final static String PROP_CONFIG_FILE = "robovm.test.configFile";
     private final static String PROP_PROPERTIES_FILE = "robovm.test.propertiesFile";
     private final static String PROP_IOS_SIGNING_IDENTITY = "robovm.test.iosSignIdentity";
@@ -161,7 +163,7 @@ public class RoboVMSurefireProvider extends AbstractProvider {
         Process process = null;
         try {
             Config config = testClient.configure(createConfig(consoleLogger), isIOS()).build();
-            config.getLogger().info("Building RoboVM tests for: %s (%s)", config.getOs(), config.getArch());
+            config.getLogger().info("Building RoboVM tests for: %s (%s%s)", config.getOs(), config.getArch(), config.getEnv().asLlvmSuffix("-"));
             config.getLogger().info("This could take a while, especially the first time round");
             AppCompiler appCompiler = new AppCompiler(config);
             appCompiler.build();
@@ -174,9 +176,7 @@ public class RoboVMSurefireProvider extends AbstractProvider {
                 DeviceType type = DeviceType.getDeviceType(System.getProperty(PROP_IOS_SIMULATOR_NAME));
                 ((IOSSimulatorLaunchParameters) launchParameters).setDeviceType(type);
             } else if(launchParameters instanceof IOSSimulatorLaunchParameters) {
-                if(config.getArch() == Arch.x86_64) {
-                    ((IOSSimulatorLaunchParameters) launchParameters).setDeviceType(DeviceType.getBestDeviceType(config.getArch(), null, null, null));
-                }
+                ((IOSSimulatorLaunchParameters) launchParameters).setDeviceType(DeviceType.getBestDeviceType(config.getArch(), null, null, null));
             }
             process = appCompiler.launchAsync(launchParameters);
             
@@ -315,6 +315,9 @@ public class RoboVMSurefireProvider extends AbstractProvider {
         }
         if (System.getProperty(PROP_ARCH) != null) {
             configBuilder.arch(Arch.valueOf(System.getProperty(PROP_ARCH)));
+        }
+        if (System.getProperty(PROP_ENVIRONMENT) != null) {
+            configBuilder.env(Environment.valueOf(System.getProperty(PROP_ENVIRONMENT)));
         }
         if (Boolean.getBoolean(PROP_IOS_SKIP_SIGNING)) {
             configBuilder.iosSkipSigning(true);

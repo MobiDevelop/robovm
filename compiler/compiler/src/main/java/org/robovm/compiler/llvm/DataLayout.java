@@ -101,11 +101,22 @@ public class DataLayout {
     }
 
     public int getOffsetOfElement(StructureType type, int idx) {
-        return runTypeQuery(type, new TypeCallback<Integer>() {
-            Integer doWithType(TargetMachine targetMachine, org.robovm.llvm.Type type) {
-                return (int) targetMachine.getDataLayout().getOffsetOfElement(type, idx);
-            }
-        });
+        if (type instanceof VectorStructureType) {
+            // special case handling for simple vector arrays like VectorFloat2 that has llvm signature as <2 x float>
+            // wrapping it into {<2 x float>} will fail on getting offset at index 1+ as there is only one element in
+            // the list
+            if (type.getOwnMembersOffset() != 0)
+                throw new IllegalArgumentException("Failed to process Vectorized struct. Probably it inherits another struct!");
+
+            // in this case just get storage size and multiply
+            return getStoreSize(type.getTypeAt(0)) * idx;
+        } else {
+            return runTypeQuery(type, new TypeCallback<Integer>() {
+                Integer doWithType(TargetMachine targetMachine, org.robovm.llvm.Type type) {
+                    return (int) targetMachine.getDataLayout().getOffsetOfElement(type, idx);
+                }
+            });
+        }
     }
 
     private static abstract class TypeCallback<T> {

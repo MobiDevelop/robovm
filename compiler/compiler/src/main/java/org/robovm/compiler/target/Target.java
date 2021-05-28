@@ -24,6 +24,7 @@ import java.util.Map;
 import org.robovm.compiler.clazz.Path;
 import org.robovm.compiler.config.Arch;
 import org.robovm.compiler.config.Config;
+import org.robovm.compiler.config.Environment;
 import org.robovm.compiler.config.OS;
 
 /**
@@ -55,6 +56,15 @@ public interface Target {
      * method returns that one.
      */
     Arch getArch();
+
+    /**
+     * @return the {@link Environment} this {@link Target} will build for. Used
+     * to differ target with same {@link Arch}.
+     * For ex. Arm64 iOS device and Arm64 m1 iOS simulator
+     */
+    default Environment getEnv() {
+        return Environment.Native;
+    }
 
     /**
      * Returns a list of the default archs to build for if no archs have been

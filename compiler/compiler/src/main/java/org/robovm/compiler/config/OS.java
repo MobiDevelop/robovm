@@ -23,22 +23,30 @@ import org.robovm.llvm.Target;
  *
  */
 public enum OS {
-    linux("linux", "linux"), macosx("macosx10.9.0", "10.9"), ios("ios8.0.0", "8.0");
+    linux("linux",  "unknown","linux"),
+    macosx("macosx", "apple", "10.9"),
+    ios("ios", "apple", "8.0");
     
     public enum Family {linux, darwin}
 
     private final String llvmName;
+    private final String vendor;
     private final String minVersion;
 
-    private OS(String llvmName, String minVersion) {
+    private OS(String llvmName, String vendor, String minVersion) {
         this.llvmName = llvmName;
+        this.vendor = vendor;
         this.minVersion = minVersion;
     }
 
     public String getLlvmName() {
         return llvmName;
     }
-    
+
+    public String getVendor() {
+        return vendor;
+    }
+
     public String getMinVersion() {
         return minVersion;
     }

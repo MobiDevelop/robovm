@@ -26,19 +26,13 @@ import com.dd.plist.PropertyListFormatException;
 import com.dd.plist.PropertyListParser;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.filefilter.AndFileFilter;
 import org.apache.commons.io.filefilter.PrefixFileFilter;
 import org.apache.commons.io.filefilter.RegexFileFilter;
 import org.apache.commons.io.filefilter.SuffixFileFilter;
 import org.apache.commons.lang3.tuple.Pair;
 import org.robovm.compiler.CompilerException;
-import org.robovm.compiler.config.AppExtension;
-import org.robovm.compiler.config.Arch;
-import org.robovm.compiler.config.Config;
-import org.robovm.compiler.config.OS;
-import org.robovm.compiler.config.Resource;
-import org.robovm.compiler.config.WatchKitApp;
+import org.robovm.compiler.config.*;
 import org.robovm.compiler.log.Logger;
 import org.robovm.compiler.target.AbstractTarget;
 import org.robovm.compiler.target.LaunchParameters;
@@ -96,6 +90,7 @@ public class IOSTarget extends AbstractTarget {
     public static final String TYPE = "ios";
 
     private Arch arch;
+    private Environment env;
     private SDK sdk;
     private File entitlementsPList;
     private SigningIdentity signIdentity;
@@ -115,19 +110,24 @@ public class IOSTarget extends AbstractTarget {
     }
 
     @Override
+    public Environment getEnv() {
+        return env;
+    }
+
+    @Override
     public LaunchParameters createLaunchParameters() {
-        if (isSimulatorArch(arch)) {
+        if (isSimulatorArch(arch, env)) {
             return new IOSSimulatorLaunchParameters();
         }
         return new IOSDeviceLaunchParameters();
     }
 
-    public static boolean isSimulatorArch(Arch arch) {
-        return arch == Arch.x86 || arch == Arch.x86_64;
+    public static boolean isSimulatorArch(Arch arch, Environment env) {
+        return env == Environment.Simulator && (arch == Arch.x86 || arch == Arch.x86_64 || arch == Arch.arm64);
     }
 
-    public static boolean isDeviceArch(Arch arch) {
-        return arch == Arch.thumbv7 || arch == Arch.arm64;
+    public static boolean isDeviceArch(Arch arch, Environment env) {
+        return env == Environment.Native &&  (arch == Arch.thumbv7 || arch == Arch.arm64);
     }
 
     /**
@@ -143,7 +143,7 @@ public class IOSTarget extends AbstractTarget {
     }
 
     public List<SDK> getSDKs() {
-        if (isSimulatorArch(arch)) {
+        if (isSimulatorArch(arch, env)) {
             return SDK.listSimulatorSDKs();
         } else {
             return SDK.listDeviceSDKs();
@@ -161,7 +161,7 @@ public class IOSTarget extends AbstractTarget {
 
     @Override
     protected Launcher createLauncher(LaunchParameters launchParameters) throws IOException {
-        if (isSimulatorArch(arch)) {
+        if (isSimulatorArch(arch, env)) {
             return createIOSSimLauncher(launchParameters);
         } else {
             return createIOSDevLauncher(launchParameters);
@@ -285,8 +285,10 @@ public class IOSTarget extends AbstractTarget {
             throw new CompilerException("Failed to get major version number from "
                     + "MinimumOSVersion string '" + minVersion + "'");
         }
-        if (isDeviceArch(arch)) {
-            ccArgs.add("-miphoneos-version-min=" + minVersion);
+
+        ccArgs.add("--target=" + config.getClangTriple(getMinimumOSVersion()));
+
+        if (isDeviceArch(arch, env)) {
             if (config.isDebug()) {
                 ccArgs.add("-Wl,-no_pie");
             }
@@ -295,7 +297,6 @@ public class IOSTarget extends AbstractTarget {
                 ccArgs.add("-fembed-bitcode");
             }
         } else {
-            ccArgs.add("-mios-simulator-version-min=" + minVersion);
             if (config.getArch() == Arch.x86 || config.isDebug()) {
                 ccArgs.add("-Wl,-no_pie");
             }
@@ -324,7 +325,7 @@ public class IOSTarget extends AbstractTarget {
         libArgs.add("-Xlinker");
         libArgs.add("@loader_path/Frameworks");
 
-        if (!isDeviceArch(arch)) {
+        if (!isDeviceArch(arch, env)) {
             // add simulated entitlement to allow Security framework to work on simulator
             File simEntitlement = createSimulatedEntitlementsPList(getBundleId());
             ccArgs.add("-Xlinker");
@@ -344,7 +345,7 @@ public class IOSTarget extends AbstractTarget {
         createInfoPList(installDir);
         generateDsym(installDir, getExecutable(), false);
 
-        if (isDeviceArch(arch)) {
+        if (isDeviceArch(arch, env)) {
             // strip local symbols
             strip(installDir, getExecutable());
 
@@ -400,7 +401,7 @@ public class IOSTarget extends AbstractTarget {
         // strip symbols to reduce application size, all debugger symbols converted into globals
         strip(appDir, getExecutable());
 
-        if (isDeviceArch(arch)) {
+        if (isDeviceArch(arch, env)) {
             if (config.isIosSkipSigning()) {
                 config.getLogger().warn("Skiping code signing. The resulting app will "
                         + "be unsigned and will not run on unjailbroken devices");
@@ -516,7 +517,7 @@ public class IOSTarget extends AbstractTarget {
             if (bundleId != null)
                 dict.put("application-identifier", bundleId);
             // xcode uses prefix for simulators entitlements
-            String prefix = isDeviceArch(arch) ? "" : "com.apple.security.";
+            String prefix = isDeviceArch(arch, env) ? "" : "com.apple.security.";
             dict.put(prefix + "get-task-allow", getTaskAllow);
             PropertyListParser.saveAsXML(dict, destFile);
             return destFile;
@@ -944,7 +945,7 @@ public class IOSTarget extends AbstractTarget {
 
             @Override
             public void processFile(Resource resource, File file, File destDir) throws IOException {
-                if (isDeviceArch(arch) && !resource.isSkipPngCrush()
+                if (isDeviceArch(arch, env) && !resource.isSkipPngCrush()
                         && file.getName().toLowerCase().endsWith(".png")) {
                     destDir.mkdirs();
                     File outFile = new File(destDir, file.getName());
@@ -1038,7 +1039,7 @@ public class IOSTarget extends AbstractTarget {
     }
 
     protected void customizeInfoPList(NSDictionary dict) {
-        if (isSimulatorArch(arch)) {
+        if (isSimulatorArch(arch, env)) {
             dict.put("CFBundleSupportedPlatforms", new NSArray(new NSString("iPhoneSimulator")));
         } else {
             dict.put("CFBundleSupportedPlatforms", new NSArray(new NSString("iPhoneOS")));
@@ -1180,18 +1181,19 @@ public class IOSTarget extends AbstractTarget {
         if (config.getArch() == null) {
             arch = Arch.thumbv7;
         } else {
-            if (!isSimulatorArch(config.getArch()) && !isDeviceArch(config.getArch())) {
+            if (!isSimulatorArch(config.getArch(), config.getEnv()) && !isDeviceArch(config.getArch(), config.getEnv())) {
                 throw new IllegalArgumentException("Arch '" + config.getArch()
                         + "' is unsupported for iOS target");
             }
             arch = config.getArch();
         }
+        env = config.getEnv();
 
         if (config.getIosInfoPList() != null) {
             config.getIosInfoPList().parse(config.getProperties());
         }
 
-        if (isDeviceArch(arch)) {
+        if (isDeviceArch(arch, env)) {
             if (!config.isSkipLinking() && !config.isIosSkipSigning()) {
                 signIdentity = config.getIosSignIdentity();
                 provisioningProfile = config.getIosProvisioningProfile();
@@ -1219,7 +1221,7 @@ public class IOSTarget extends AbstractTarget {
         List<SDK> sdks = getSDKs();
         if (sdkVersion == null) {
             if (sdks.isEmpty()) {
-                throw new IllegalArgumentException("No " + (isDeviceArch(arch) ? "device" : "simulator")
+                throw new IllegalArgumentException("No " + (isDeviceArch(arch, env) ? "device" : "simulator")
                         + " SDKs installed");
             }
             Collections.sort(sdks);

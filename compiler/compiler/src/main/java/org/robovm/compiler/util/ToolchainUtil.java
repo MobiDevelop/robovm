@@ -28,6 +28,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.robovm.compiler.config.Arch;
 import org.robovm.compiler.config.Config;
+import org.robovm.compiler.config.Environment;
 import org.robovm.compiler.config.OS;
 import org.robovm.compiler.config.tools.TextureAtlas;
 import org.robovm.compiler.log.ConsoleLogger;
@@ -255,9 +256,9 @@ public class ToolchainUtil {
         }
 
         opts.add("--platform");
-        if (IOSTarget.isDeviceArch(config.getArch())) {
+        if (IOSTarget.isDeviceArch(config.getArch(), config.getEnv())) {
             opts.add("iphoneos");
-        } else if (IOSTarget.isSimulatorArch(config.getArch())) {
+        } else if (IOSTarget.isSimulatorArch(config.getArch(), config.getEnv())) {
             opts.add("iphonesimulator");
         }
 
@@ -390,8 +391,6 @@ public class ToolchainUtil {
             opts.add("-g");
         }
         if (isDarwin) {
-            opts.add("-arch");
-            opts.add(config.getArch().getClangName());
             for (File objectsFile : objectsFiles) {
                 opts.add("-Wl,-filelist," + objectsFile.getAbsolutePath());
             }

@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.20.0)
+
 project(robovm-libimobiledevice)
 include(ExternalProject)
 
@@ -6,52 +7,46 @@ find_package(JNI REQUIRED)
 
 if(OS STREQUAL "linux")
   set(LINUX YES)
+  if (ARCH STREQUAL "x86_64")
+    set(X86_64 YES)
+    set(C_CXX_FLAGS "${C_CXX_FLAGS} -m64")
+    set(LD_FLAGS "${LD_FLAGS} -m64")
+  else()
+    message(FATAL_ERROR "Unsupported ARCH: ${ARCH}")
+  endif()
 elseif(OS STREQUAL "macosx")
   set(MACOSX YES)
-endif()
-
-if (ARCH STREQUAL "x86")
-  set(X86 YES)
-elseif (ARCH STREQUAL "x86_64")
-  set(X86_64 YES)
-endif()
-
-set(C_CXX_FLAGS "${C_CXX_FLAGS} -fdata-sections -ffunction-sections -Wno-unused")
-if(MACOSX AND X86)
-  set(C_CXX_FLAGS "${C_CXX_FLAGS} -arch i386 -mmacosx-version-min=10.6")
-  set(LD_FLAGS "${LD_FLAGS} -arch i386 -mmacosx-version-min=10.6")
-elseif(MACOSX AND X86_64)
-  set(C_CXX_FLAGS "${C_CXX_FLAGS} -arch x86_64 -mmacosx-version-min=10.6")
-  set(LD_FLAGS "${LD_FLAGS} -arch x86_64 -mmacosx-version-min=10.6")
-elseif(LINUX AND X86)
-  set(C_CXX_FLAGS "${C_CXX_FLAGS} -m32 -fPIC")
-  set(LD_FLAGS "${LD_FLAGS} -m32")
-elseif(LINUX AND X86_64)
-  set(C_CXX_FLAGS "${C_CXX_FLAGS} -m64 -fPIC")
-  set(LD_FLAGS "${LD_FLAGS} -m64")
-endif()
-
-set(EXTPREFIX "${CMAKE_BINARY_DIR}/ext")
-set(C_CXX_FLAGS "${C_CXX_FLAGS} -I${EXTPREFIX}/include -I/usr/local/include")
-set(EXTCFLAGS "-I${EXTPREFIX}/include/libusb-1.0 -I${EXTPREFIX}/include/libxml2 ${C_CXX_FLAGS}")
-set(LDFLAGS "-L${EXTPREFIX}/lib")
-
-if(MACOSX)
-  exec_program(xcode-select ARGS --print-path OUTPUT_VARIABLE XCODE_PATH)
-  set(SYSROOT "${XCODE_PATH}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk")
-  if(NOT IS_DIRECTORY ${SYSROOT})
-    set(SYSROOT "${XCODE_PATH}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk")
+  if (ARCH STREQUAL "x86_64")
+    set(X86_64 YES)
+    set(C_CXX_FLAGS "${C_CXX_FLAGS} --target=x86_64-apple-macos10.6")
+    set(LD_FLAGS "${LD_FLAGS} --target=x86_64-apple-macos10.6")
+    set(TENTATIVE_CROSS_COMPILE_HOST "--host=x86_64-apple-darwin")
+  elseif (ARCH STREQUAL "arm64")
+    set(ARM64 YES)
+    set(C_CXX_FLAGS "${C_CXX_FLAGS} --target=arm64-apple-macos11.0")
+    set(LD_FLAGS "${LD_FLAGS} --target=arm64-apple-macos11.0")
+    set(TENTATIVE_CROSS_COMPILE_HOST "--host=aarch64-apple-darwin")
+  else()
+    message(FATAL_ERROR "Unsupported ARCH: ${ARCH}")
   endif()
+
+  exec_program(xcode-select ARGS --print-path OUTPUT_VARIABLE XCODE_PATH)
+  set(SYSROOT "${XCODE_PATH}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk")
   if(NOT IS_DIRECTORY ${SYSROOT})
     message(FATAL_ERROR "No supported MacOSX SDK found")
   endif()
-  if(NOT IS_DIRECTORY "/usr/local/opt/openssl/include")
-    message(FATAL_ERROR "No OpenSSL found")
-  endif()
-  set(C_CXX_FLAGS "${C_CXX_FLAGS} -isysroot ${SYSROOT}")
-  set(EXTCFLAGS "${EXTCFLAGS} -I/usr/local/opt/openssl/include -isysroot ${SYSROOT}")
-  set(LDFLAGS "${LDFLAGS} -L/usr/local/opt/openssl/lib")
+  set(CMAKE_OSX_SYSROOT "${SYSROOT}")
+  set(EXTCFLAGS "-isysroot ${SYSROOT}")
+else()
+  message(FATAL_ERROR "Unsupported OS: ${OS}")
 endif()
+
+set(C_CXX_FLAGS "${C_CXX_FLAGS} -fdata-sections -ffunction-sections -Wno-unused")
+
+set(EXTPREFIX "${CMAKE_BINARY_DIR}/ext")
+set(C_CXX_FLAGS "${C_CXX_FLAGS} -I${EXTPREFIX}/include -I/usr/local/include")
+set(EXTCFLAGS "${EXTCFLAGS} -I${EXTPREFIX}/include/libusb-1.0 -I${EXTPREFIX}/include/libxml2 ${C_CXX_FLAGS}")
+set(LDFLAGS "-L${EXTPREFIX}/lib")
 
 if (LINUX)
   # some linuxes ship old version of openssl which will cause library not found so it is better to link it staticaly
@@ -63,19 +58,19 @@ if (LINUX)
 elseif (MACOSX)
   # starting 10.13 macosx ships libressl instead of openssl. which will cause library not found so it is better to link it staticaly
   ExternalProject_Add(extopenssl
-    URL https://github.com/openssl/openssl/archive/OpenSSL_1_1_1g.zip
-    CONFIGURE_COMMAND bash -c "./Configure darwin64-x86_64-cc no-shared no-capieng --prefix=${EXTPREFIX} --openssldir=${EXTPREFIX}"
+    URL https://github.com/openssl/openssl/archive/OpenSSL_1_1_1i.zip
+    CONFIGURE_COMMAND bash -c "./Configure darwin64-${ARCH}-cc no-shared no-capieng --prefix=${EXTPREFIX} --openssldir=${EXTPREFIX}"
     BUILD_IN_SOURCE 1
   )
 endif()
 ExternalProject_Add(extlibusbx
   URL https://github.com/libusb/libusb/archive/v1.0.23.zip
-  CONFIGURE_COMMAND bash -c "CC=${CMAKE_C_COMPILER} CFLAGS='${EXTCFLAGS}' ./autogen.sh --enable-shared=no --prefix=${EXTPREFIX} --without-cython"
+  CONFIGURE_COMMAND bash -c "CC=${CMAKE_C_COMPILER} CFLAGS='${EXTCFLAGS}' ./autogen.sh ${TENTATIVE_CROSS_COMPILE_HOST} --enable-shared=no --prefix=${EXTPREFIX} --without-cython"
   BUILD_IN_SOURCE 1
 )
 ExternalProject_Add(extlibplist
   URL https://github.com/libimobiledevice/libplist/archive/2.0.0.tar.gz
-  CONFIGURE_COMMAND bash -c "CC=${CMAKE_C_COMPILER} CFLAGS='${EXTCFLAGS}' PKG_CONFIG_PATH='${EXTPREFIX}/lib/pkgconfig' ./autogen.sh --enable-shared=no --enable-udev=no --prefix=${EXTPREFIX} --without-cython"
+  CONFIGURE_COMMAND bash -c "CC=${CMAKE_C_COMPILER} CFLAGS='${EXTCFLAGS}' PKG_CONFIG_PATH='${EXTPREFIX}/lib/pkgconfig' ./autogen.sh ${TENTATIVE_CROSS_COMPILE_HOST} --enable-shared=no --enable-udev=no --prefix=${EXTPREFIX} --without-cython"
   BUILD_IN_SOURCE 1
 )
 ExternalProject_Add(extlibusbmuxd
@@ -92,7 +87,7 @@ endif()
 ExternalProject_Add(extlibimobiledevice
   GIT_REPOSITORY https://github.com/libimobiledevice/libimobiledevice.git
   GIT_TAG 60823f9eeb3f09cd8083f613522d01e21d2f6d2d
-  CONFIGURE_COMMAND bash -c "PKG_CONFIG_PATH='${EXTPREFIX}/lib/pkgconfig' CFLAGS='${LIBIMOBILEDEVICE_CFLAGS}' LDFLAGS='${LDFLAGS}' ./autogen.sh --prefix=${EXTPREFIX} --enable-debug-code --enable-shared=no --without-cython"
+  CONFIGURE_COMMAND bash -c "PKG_CONFIG_PATH='${EXTPREFIX}/lib/pkgconfig' CFLAGS='${LIBIMOBILEDEVICE_CFLAGS}' LDFLAGS='${LDFLAGS}' ./autogen.sh ${TENTATIVE_CROSS_COMPILE_HOST} --prefix=${EXTPREFIX} --enable-debug-code --enable-shared=no --without-cython"
   UPDATE_COMMAND ""
   PATCH_COMMAND bash -c "${CMAKE_SOURCE_DIR}/patches/apply-patches"
   BUILD_IN_SOURCE 1

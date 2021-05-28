@@ -279,7 +279,7 @@ int LLVMTargetMachineAssembleToOutputStream(LLVMTargetMachineRef TM, LLVMMemoryB
   std::unique_ptr<MCRegisterInfo> MRI(TheTarget->createMCRegInfo(TripleName));
   std::unique_ptr<MCAsmInfo> MAI(TheTarget->createMCAsmInfo(*MRI, TripleName));
   std::unique_ptr<MCObjectFileInfo> MOFI(new MCObjectFileInfo());
-  MCContext Ctx(MAI.get(), MRI.get(), MOFI.get(), &SrcMgr);
+  MCContext Ctx(Triple(TripleName), MAI.get(), MRI.get(), MOFI.get(), &SrcMgr);
   MOFI->InitMCObjectFileInfo(TripleName, RelocModel, CMModel, Ctx);
 
   std::unique_ptr<MCInstrInfo> MCII(TheTarget->createMCInstrInfo());

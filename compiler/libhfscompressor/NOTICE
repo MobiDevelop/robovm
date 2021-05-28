@@ -1,0 +1,11 @@
+hfscompressor
+Copyright (C) 2012-2015 RoboVM AB
+For license information see the LICENSE.txt file which accompanies this
+NOTICE.txt file.
+
+Third party libraries
+---------------------
+hfscompressor includes the libarchive library. This library is
+copyright 2003-2009 Tim Kientzle and released under the 2-clause
+BSD license.
+http://www.libarchive.org

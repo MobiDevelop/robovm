@@ -76,10 +76,10 @@ public class CreateIpaAction extends AnAction {
         private final Module module;
         private final String signingIdentity;
         private final String provisioningProfile;
-        private final List<Arch> archs;
+        private final Arch[] archs;
         private final File destinationDir;
 
-        public IpaConfig(Module module, File destinationDir, String signingIdentity, String provisioningProile, List<Arch> archs) {
+        public IpaConfig(Module module, File destinationDir, String signingIdentity, String provisioningProile, Arch[] archs) {
             this.module = module;
             this.destinationDir = destinationDir;
             this.signingIdentity = signingIdentity;
@@ -99,7 +99,7 @@ public class CreateIpaAction extends AnAction {
             return provisioningProfile;
         }
 
-        public List<Arch> getArchs() {
+        public Arch[] getArchs() {
             return archs;
         }
 

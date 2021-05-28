@@ -21,6 +21,7 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.robovm.compiler.AppCompiler;
 import org.robovm.compiler.config.Arch;
 import org.robovm.compiler.config.Config;
+import org.robovm.compiler.config.Environment;
 import org.robovm.compiler.config.OS;
 import org.robovm.compiler.target.ios.DeviceType;
 import org.robovm.compiler.target.ios.DeviceType.DeviceFamily;
@@ -51,12 +52,17 @@ public abstract class AbstractIOSSimulatorMojo extends AbstractRoboVMMojo {
 
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
-            Arch arch = Arch.x86_64;
-            if (super.arch != null && super.arch.equals(Arch.x86.toString())) {
-                arch = Arch.x86;
+            Arch arch = DeviceType.DEFAULT_HOST_ARCH;
+            if (super.arch != null) {
+                if (super.arch.equals(Arch.x86.toString()))
+                    arch = Arch.x86;
+                if (super.arch.equals(Arch.x86_64.toString()))
+                    arch = Arch.x86_64;
+                else if (super.arch.equals(Arch.arm64.toString()))
+                    arch = Arch.arm64;
             }
 
-            AppCompiler compiler = build(OS.ios, arch, IOSTarget.TYPE);
+            AppCompiler compiler = build(OS.ios, arch, Environment.Simulator, IOSTarget.TYPE);
             Config config = compiler.getConfig();
             IOSSimulatorLaunchParameters launchParameters = (IOSSimulatorLaunchParameters)
                 config.getTarget().createLaunchParameters();

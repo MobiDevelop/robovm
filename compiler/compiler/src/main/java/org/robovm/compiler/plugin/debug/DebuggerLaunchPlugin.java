@@ -121,7 +121,7 @@ public class DebuggerLaunchPlugin extends LaunchPlugin {
             File appDir = new File(config.isSkipInstall() ? config.getTmpDir() : config.getInstallDir(), config.getExecutableName() + ".app");
             builder.setAppfile(new File(appDir, config.getExecutableName()));
 
-            if (IOSTarget.isSimulatorArch(target.getArch())) {
+            if (IOSTarget.isSimulatorArch(config.getArch(), config.getEnv())) {
                 // launching on simulator, it can write down port number to file on local system
                 File hooksPortFile;
                 try {

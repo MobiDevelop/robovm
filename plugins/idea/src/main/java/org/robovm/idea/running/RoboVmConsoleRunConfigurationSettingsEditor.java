@@ -24,7 +24,9 @@ import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
+import org.robovm.compiler.config.Arch;
 import org.robovm.compiler.target.ConsoleTarget;
+import org.robovm.compiler.target.ios.DeviceType;
 import org.robovm.idea.RoboVmPlugin;
 
 import javax.swing.*;
@@ -37,6 +39,7 @@ public class RoboVmConsoleRunConfigurationSettingsEditor extends SettingsEditor<
     private JTextArea args;
     private JTextField workingDir;
     private JButton browseButton;
+    private JComboBox<Arch> deviceArch;
 
     @Override
     protected void resetEditorFrom(@NotNull RoboVmRunConfiguration config) {
@@ -47,7 +50,10 @@ public class RoboVmConsoleRunConfigurationSettingsEditor extends SettingsEditor<
     protected void applyEditorTo(@NotNull RoboVmRunConfiguration config) throws ConfigurationException {
         if (module.getSelectedItem() == null)
             throw new ConfigurationException("RoboVM module is not specified!");
+        if (deviceArch.getSelectedItem() == null)
+            throw buildConfigurationException("Device architecture is not specified!", () -> deviceArch.setSelectedItem(DeviceType.DEFAULT_HOST_ARCH));
         config.setModuleName(module.getSelectedItem().toString());
+        config.setDeviceArch((Arch)deviceArch.getSelectedItem());
         config.setTargetType(RoboVmRunConfiguration.TargetType.Console);
         config.setArguments(args.getText());
         config.setWorkingDir(workingDir.getText());
@@ -70,6 +76,14 @@ public class RoboVmConsoleRunConfigurationSettingsEditor extends SettingsEditor<
                 this.module.setSelectedIndex(this.module.getItemCount() - 1);
             }
         }
+
+        // populate arch
+        deviceArch.removeAllItems();
+        if (DeviceType.DEFAULT_HOST_ARCH == Arch.arm64)
+            deviceArch.addItem(Arch.arm64);
+        deviceArch.addItem(Arch.x86_64);
+        if (config.getDeviceArch() == Arch.x86_64 || config.getDeviceArch() == DeviceType.DEFAULT_HOST_ARCH)
+            deviceArch.setSelectedItem(config.getDeviceArch());
 
         this.args.setText(config.getArguments());
         String dir = config.getWorkingDir();
@@ -94,5 +108,14 @@ public class RoboVmConsoleRunConfigurationSettingsEditor extends SettingsEditor<
                 workingDir.setText(dir1[0].getCanonicalPath());
             }
         });
+    }
+
+    /**
+     * helper to build exception with quick fix action
+     */
+    ConfigurationException buildConfigurationException(String message, Runnable quickFix) {
+        ConfigurationException exc = new ConfigurationException(message);
+        exc.setQuickFix(quickFix);
+        return exc;
     }
 }

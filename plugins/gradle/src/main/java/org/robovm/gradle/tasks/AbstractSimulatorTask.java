@@ -21,6 +21,7 @@ import org.gradle.api.GradleException;
 import org.robovm.compiler.AppCompiler;
 import org.robovm.compiler.config.Arch;
 import org.robovm.compiler.config.Config;
+import org.robovm.compiler.config.Environment;
 import org.robovm.compiler.config.OS;
 import org.robovm.compiler.target.ios.DeviceType;
 import org.robovm.compiler.target.ios.IOSSimulatorLaunchParameters;
@@ -32,7 +33,7 @@ public abstract class AbstractSimulatorTask extends AbstractRoboVMTask {
 
     protected void launch(DeviceType type) {
         try {
-            AppCompiler compiler = build(getOs(), getArch(), getTargetType());
+            AppCompiler compiler = build(getOs(), getArch(), Environment.Simulator, getTargetType());
 
             if (extension.isSkipLaunch()) {
                 return;

@@ -447,7 +447,7 @@ static inline void proxy0ReturnDouble(CallInfo* ci, jdouble d) {
     ci->returnType = RETURN_TYPE_DOUBLE;
 }
 
-#elif IOS && RVM_ARM64
+#elif (MACOSX || IOS) && RVM_ARM64
 
 #define MAX_INT_ARGS 8
 #define MAX_FP_ARGS 8

@@ -1,32 +1,6 @@
+cmake_minimum_required(VERSION 3.20.0)
 
 include(ExternalProject)
-
-if(OS STREQUAL "linux")
-  set(LINUX YES)
-elseif(OS STREQUAL "macosx")
-  set(MACOSX YES)
-elseif(OS STREQUAL "windows")
-  set(WINDOWS YES)
-endif()
-
-if (WINDOWS)
-  # set(CMAKE_CROSSCOMPILING TRUE) 
-  set(CMAKE_SYSTEM_NAME Windows)
-
-  #should be passed from build.sh, just here to prevent warning
-  set(CMAKE_RC_COMPILER "/usr/bin/x86_64-w64-mingw32-windres")
-  
-  #these are not actually used by robovm but find_package does not always resolve them, use JAVA_HOME env var to prevent paths?
-  set(JAVA_AWT_LIBRARY "/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/libawt.so")
-  set(JAVA_JVM_LIBRARY "/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server/libjvm.so")
-
-  # adjust the default behaviour of the FIND_XXX() commands:
-  # search headers and libraries in the target environment, search
-  # programs in the host environment
-  set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-  set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-  set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-endif()
 
 project(robovm-llvm)
 
@@ -35,41 +9,40 @@ find_package(JNI REQUIRED)
 message (STATUS "JNI_INCLUDE_DIRS=${JNI_INCLUDE_DIRS}")
 message (STATUS "JNI_LIBRARIES=${JNI_LIBRARIES}")
 
-if (ARCH STREQUAL "x86")
-  set(X86 YES)
-elseif (ARCH STREQUAL "x86_64")
-  set(X86_64 YES)
-endif()
-
-set(C_CXX_FLAGS "${C_CXX_FLAGS} -fvisibility=hidden -fdata-sections -ffunction-sections")
-if(MACOSX AND X86_64)
-  set(C_CXX_FLAGS "${C_CXX_FLAGS} -arch x86_64 -mmacosx-version-min=10.12")
-  set(LD_FLAGS "${LD_FLAGS} -arch x86_64 -mmacosx-version-min=10.12")
-elseif(LINUX AND X86)
-  set(C_CXX_FLAGS "${C_CXX_FLAGS} -m32")
-  set(LD_FLAGS "${LD_FLAGS} -m64")
-elseif(LINUX AND X86_64)
-  set(C_CXX_FLAGS "${C_CXX_FLAGS} -m64")
-  set(LD_FLAGS "${LD_FLAGS} -m64")
-elseif(WINDOWS AND X86)
-  set(C_CXX_FLAGS "${C_CXX_FLAGS} -m32")
-  set(LD_FLAGS "${LD_FLAGS} -m32")
-elseif(WINDOWS AND X86_64)
-  set(C_CXX_FLAGS "${C_CXX_FLAGS} -m64")
-  set(LD_FLAGS "${LD_FLAGS} -m64")
-endif()
-
-if(MACOSX)
-  exec_program(xcode-select ARGS --print-path OUTPUT_VARIABLE XCODE_PATH)
-  set(SYSROOT "${XCODE_PATH}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk")
-  if(NOT IS_DIRECTORY ${SYSROOT})
-    set(SYSROOT "${XCODE_PATH}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk")
+if(OS STREQUAL "linux")
+  set(LINUX YES)
+  if (ARCH STREQUAL "x86_64")
+    set(X86_64 YES)
+    set(C_CXX_FLAGS "${C_CXX_FLAGS} -m64")
+    set(LD_FLAGS "${LD_FLAGS} -m64")
+  else()
+    message(FATAL_ERROR "Unsupported ARCH: ${ARCH}")
   endif()
+elseif(OS STREQUAL "macosx")
+  set(MACOSX YES)
+  if (ARCH STREQUAL "x86_64")
+    set(X86_64 YES)
+    set(C_CXX_FLAGS "${C_CXX_FLAGS} --target=x86_64-apple-macos10.9")
+    set(LD_FLAGS "${LD_FLAGS} --target=x86_64-apple-macos10.9")
+  elseif (ARCH STREQUAL "arm64")
+    set(ARM64 YES)
+    set(C_CXX_FLAGS "${C_CXX_FLAGS} --target=arm64-apple-macos11.0")
+    set(LD_FLAGS "${LD_FLAGS} --target=arm64-apple-macos11.0")
+  else()
+    message(FATAL_ERROR "Unsupported ARCH: ${ARCH}")
+  endif()
+
+  exec_program(xcode-select ARGS --print-path OUTPUT_VARIABLE XCODE_PATH)
+  set(SYSROOT "${XCODE_PATH}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk")
   if(NOT IS_DIRECTORY ${SYSROOT})
     message(FATAL_ERROR "No supported MacOSX SDK found")
   endif()
-  set(C_CXX_FLAGS "${C_CXX_FLAGS} -isysroot ${SYSROOT}")
+  set(CMAKE_OSX_SYSROOT "${SYSROOT}")
+else()
+  message(FATAL_ERROR "Unsupported OS: ${OS}")
 endif()
+
+set(C_CXX_FLAGS "${C_CXX_FLAGS} -fvisibility=hidden -fdata-sections -ffunction-sections")
 
 ExternalProject_Add(extclang 
   GIT_REPOSITORY git://github.com/mobivm/clang.git
@@ -90,7 +63,7 @@ ExternalProject_Add(extllvm
   GIT_TAG aceb47b80838681fe65a1d01aac7aae7b863ac5a
   PATCH_COMMAND bash -c "rm -rf tools/clang && ln -s ../../../../extclang-prefix/src/extclang tools/clang && ${CMAKE_SOURCE_DIR}/patches/apply-patches"
   LIST_SEPARATOR ^^
-  CONFIGURE_COMMAND cmake -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_RC_COMPILER=${CMAKE_RC_COMPILER} -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DBUILD_SHARED_LIBS=OFF "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/llvm" "-DLLVM_TARGETS_TO_BUILD=${LLVM_ARCHS}" "-DCMAKE_C_FLAGS=${LLVM_C_FLAGS}" "-DCMAKE_CXX_FLAGS=${LLVM_CXX_FLAGS}" -DLLVM_ENABLE_LIBCXX=YES -DLLVM_ENABLE_CXX1Y=YES -DLLVM_ENABLE_THREADS=YES -DLIBCLANG_BUILD_STATIC=YES ../extllvm/
+  CONFIGURE_COMMAND cmake -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME} -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT} -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_RC_COMPILER=${CMAKE_RC_COMPILER} -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DBUILD_SHARED_LIBS=OFF "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/llvm" "-DLLVM_TARGETS_TO_BUILD=${LLVM_ARCHS}" "-DCMAKE_C_FLAGS=${LLVM_C_FLAGS}" "-DCMAKE_CXX_FLAGS=${LLVM_CXX_FLAGS}" -DLLVM_ENABLE_LIBCXX=YES -DLLVM_ENABLE_CXX1Y=YES -DLLVM_ENABLE_THREADS=YES -DLIBCLANG_BUILD_STATIC=YES ../extllvm/
 )
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${C_CXX_FLAGS}")
@@ -142,11 +115,6 @@ if(LINUX)
     -L"${CMAKE_BINARY_DIR}/llvm/lib"
     -lrt -ldl -lpthread -lz
   )
-elseif(WINDOWS)
-  set(LLVM_LDFLAGS
-    -L"${CMAKE_BINARY_DIR}/llvm/lib"
-    -ldbghelp -static-libgcc -static-libstdc++
-  )
 elseif(MACOSX)
   set(LLVM_LDFLAGS
     -L"${CMAKE_BINARY_DIR}/llvm/lib"
@@ -170,8 +138,4 @@ elseif(MACOSX)
   set_target_properties(robovm-llvm PROPERTIES LINK_FLAGS "-Wl,-dead_strip -Wl,-exported_symbols_list -Wl,${CMAKE_SOURCE_DIR}/src/main/native/exports_macosx.sym")
 endif()
 set(INSTALL_DIR ${CMAKE_SOURCE_DIR}/src/main/resources/org/robovm/llvm/binding/${OS}/${ARCH})
-if(WINDOWS)
-  install(TARGETS robovm-llvm RUNTIME DESTINATION ${INSTALL_DIR})
-else()
-  install(TARGETS robovm-llvm LIBRARY DESTINATION ${INSTALL_DIR})
-endif()
+install(TARGETS robovm-llvm LIBRARY DESTINATION ${INSTALL_DIR})

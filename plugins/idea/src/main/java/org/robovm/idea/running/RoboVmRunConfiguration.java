@@ -37,6 +37,7 @@ import org.jetbrains.annotations.Nullable;
 import org.robovm.compiler.AppCompiler;
 import org.robovm.compiler.config.Arch;
 import org.robovm.compiler.config.Config;
+import org.robovm.compiler.target.ios.DeviceType;
 import org.robovm.idea.RoboVmPlugin;
 
 import java.util.Collection;
@@ -98,10 +99,11 @@ public class RoboVmRunConfiguration extends ModuleBasedConfiguration<RoboVmRunCo
             signingIdentityType = EntryType.AUTO;
             provisioningProfileType = EntryType.AUTO;
             simulatorType = EntryType.AUTO;
-            simulatorArch = Arch.x86_64;
+            simulatorArch = DeviceType.DEFAULT_HOST_ARCH;
             simulatorLaunchWatch = false;
         } else if (type instanceof RoboVmConsoleConfigurationType) {
             targetType = TargetType.Console;
+            deviceArch = DeviceType.DEFAULT_HOST_ARCH;
         }
     }
 
@@ -323,13 +325,15 @@ public class RoboVmRunConfiguration extends ModuleBasedConfiguration<RoboVmRunCo
                 targetType = TargetType.Device;
 
             if (simulatorType == EntryType.AUTO || simulatorType == EntryType.AUTO2)
-                simulatorArch = Arch.x86_64;
+                simulatorArch = DeviceType.DEFAULT_HOST_ARCH;
 
             // migrate simulator to new code if legacy found
             if (AUTO_SIGNING_IDENTITY_LEGACY.equals(simulator))
                 simulator = AUTO_SIGNING_IDENTITY;
         } else if (type instanceof RoboVmConsoleConfigurationType) {
             // MacOsX console target
+            if (deviceArch != Arch.x86_64 && deviceArch != DeviceType.DEFAULT_HOST_ARCH)
+                deviceArch = DeviceType.DEFAULT_HOST_ARCH;
             targetType = TargetType.Console;
         }
     }
