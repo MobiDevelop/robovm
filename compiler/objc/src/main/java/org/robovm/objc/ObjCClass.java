@@ -52,6 +52,8 @@ public final class ObjCClass extends ObjCObject {
     private static final String CUSTOM_CLASS_NAME_PREFIX = "j_";
     private static final String MISSING_CLASS_NAME_PREFIX = "missing_";
 
+    private static final Selector SELECTOR_NSOBJECT_CLASS = Selector.register("class");
+
     static {
         ObjCRuntime.bind(ObjCClass.class);
         @SuppressWarnings("unchecked")
@@ -223,6 +225,15 @@ public final class ObjCClass extends ObjCObject {
     
     public static ObjCClass getFromObject(long handle) {
         long classPtr = ObjCRuntime.object_getClass(handle);
+        // dkimitsa. There is a bug observed in iOS12 that causes not all Objective-C class fields properly initialized
+        // in Class instance of Swift classes. This causes a crash in APIs like class_copyProtocolList to crash
+        // as it faces not initialized data. Example of such class is `Swift.__EmptyDictionarySingleton`.
+        // Workaround for this case is to call [NSObject class] selector that initializes all structs.
+        // ObjCClass is not always NSObject check for responds to selector is required here.
+        // similar case: https://github.com/xamarin/xamarin-macios/pull/6293
+        if (classPtr != 0 && ObjCRuntime.class_respondsToSelector(classPtr, SELECTOR_NSOBJECT_CLASS.getHandle())) {
+            classPtr = ObjCRuntime.ptr_objc_msgSend(handle, SELECTOR_NSOBJECT_CLASS.getHandle());
+        }
         return toObjCClass(classPtr);
     }
     
