@@ -30,18 +30,7 @@ import org.apache.commons.lang3.tuple.ImmutableTriple;
 import org.apache.commons.lang3.tuple.Triple;
 import org.robovm.compiler.clazz.Clazz;
 import org.robovm.compiler.config.Config;
-import org.robovm.compiler.llvm.Function;
-import org.robovm.compiler.llvm.FunctionAttribute;
-import org.robovm.compiler.llvm.FunctionDeclaration;
-import org.robovm.compiler.llvm.FunctionRef;
-import org.robovm.compiler.llvm.FunctionType;
-import org.robovm.compiler.llvm.Global;
-import org.robovm.compiler.llvm.Linkage;
-import org.robovm.compiler.llvm.NullConstant;
-import org.robovm.compiler.llvm.Ret;
-import org.robovm.compiler.llvm.StructureType;
-import org.robovm.compiler.llvm.Unreachable;
-import org.robovm.compiler.llvm.Value;
+import org.robovm.compiler.llvm.*;
 import org.robovm.compiler.trampoline.Anewarray;
 import org.robovm.compiler.trampoline.Checkcast;
 import org.robovm.compiler.trampoline.FieldAccessor;
@@ -151,7 +140,7 @@ public class TrampolineCompiler {
                 alias(t, fnRef.getName());
             } else {
                 String fnName = Symbols.checkcastSymbol(t.getTarget());
-                alias(t, fnName);
+                weakAlias(t, fnName);
             }
         } else if (t instanceof LdcClass) {
             if (isArray(t.getTarget())) {
@@ -159,7 +148,7 @@ public class TrampolineCompiler {
                 alias(t, fnRef.getName());
             } else {
                 String fnName = Symbols.ldcExternalSymbol(t.getTarget());
-                alias(t, fnName);
+                weakAlias(t, fnName);
             }
         } else if (t instanceof Anewarray) {
             FunctionRef fnRef = createAnewarray((Anewarray) t);
@@ -259,7 +248,30 @@ public class TrampolineCompiler {
         fn.add(new Ret(result));
         mb.addFunction(fn);
     }
-    
+
+    /**
+     * Similar to alias but creates weak stub that will be replaced with expected strong during linking.
+     * Its a workaround for aggressive tree shaking case, when method to be dropped referencing external [ldcext]
+     * but last one is not included as class is opted out as well.
+     */
+    private void weakAlias(Trampoline t, String fnName) {
+        FunctionRef aliasee = new FunctionRef(fnName, t.getFunctionType());
+        if (!mb.hasSymbol(fnName)) {
+            Function fn = new FunctionBuilder(fnName, t.getFunctionType())
+                    .attrib(noinline)
+                    .linkage(weak).build();
+            call(fn, BC_THROW_NO_SUCH_METHOD_ERROR, fn.getParameterRef(0),
+                    mb.getString("Internal Error: trampoline missing"));
+            fn.add(new Unreachable());
+            mb.addFunction(fn);
+        }
+
+        Function fn = new FunctionBuilder(t).linkage(aliasLinkage()).attribs(shouldInline(), optsize).build();
+        Value result = call(fn, aliasee, fn.getParameterRefs());
+        fn.add(new Ret(result));
+        mb.addFunction(fn);
+    }
+
     private void createTrampolineAliasForField(FieldAccessor t, SootField field) {
         String fnName = t.isGetter() ? Symbols.getterSymbol(field) : Symbols.setterSymbol(field);
         if (t.isStatic()) {
