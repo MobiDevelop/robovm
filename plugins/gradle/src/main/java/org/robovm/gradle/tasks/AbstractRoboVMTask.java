@@ -29,6 +29,7 @@ import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.tasks.TaskAction;
+import org.gradle.api.tasks.Internal;
 import org.robovm.compiler.AppCompiler;
 import org.robovm.compiler.config.Arch;
 import org.robovm.compiler.config.Config;
@@ -73,6 +74,7 @@ abstract public class AbstractRoboVMTask extends DefaultTask {
     protected final RepositorySystem repositorySystem;
     protected final RepositorySystemSession repositorySystemSession;
     protected final List<RemoteRepository> remoteRepositories;
+    @Internal
     protected Logger roboVMLogger;
 
     public AbstractRoboVMTask() {
